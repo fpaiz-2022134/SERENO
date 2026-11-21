@@ -130,7 +130,7 @@ que devuelve met.no y la usa como TTL de caché.
 **Queda descartada para el motor** —sin punto de rocío y sin histórico— y se usa
 solo para comparar: `/api/clima?...&comparar=1`.
 
-### 3 · GDELT DOC 2.0 — ⚠️ **integrada, pero hoy devuelve cero artículos**
+### 3 · GDELT DOC 2.0 — ⚠️ **integrada y funcional; las consultas de roya no traen cobertura**
 
 | | |
 |---|---|
@@ -139,23 +139,35 @@ solo para comparar: `/api/clima?...&comparar=1`.
 | Temas | roya, broca, ojo de gallo, sequía, precio del café, exportaciones |
 | Dedup | por URL y por título normalizado; Guatemala y Centroamérica suben en el orden |
 
-**Lo honesto:** el endpoint **responde HTTP 200** y el módulo lo consume bien,
-pero **todas las consultas probadas devolvieron 0 artículos** — `"roya del cafe"`,
-`"roya del café"`, `"coffee leaf rust"`, `"precio del café"`, `café
-sourcecountry:guatemala`, en ventanas de 1 semana a 24 meses. También aprendimos
-que GDELT exige que los términos con `OR` vayan entre paréntesis
-(`"Queries containing OR'd terms must be surrounded by ()."`), y eso ya está
-corregido en el módulo.
+**La API funciona — eso está probado.** Consulta de control
+`query=guatemala&timespan=1week`: **5 artículos**, entre ellos uno de
+`prensalibre.com` sobre la oferta de café de Guatemala. Así que cuando una
+consulta devuelve 0, **no es que la fuente esté caída**.
 
-En la corrida final las tres consultas devolvieron **HTTP 429**: probando la API
-intensivamente durante el día nuestra IP quedó limitada. El módulo ya serializa a
-5.5 s, pero **conviene volver a correr `npm run probar-fuentes` en frío** para
-separar «sin cobertura» de «IP limitada».
+**Lo que no trae nada son las frases exactas.** `"roya del cafe"`,
+`"roya del café"`, `"coffee leaf rust"` y `"precio del café"` devolvieron
+**0 artículos** en ventanas de 1 semana a 24 meses. Y el término `roya` solo, sin
+`cafe`, trae ruido (devolvió un artículo de cine).
 
-**No sabemos todavía** si es que no hay cobertura reciente de estos términos o si
-la consulta necesita otra forma. **Para el pitch: no prometer el mapa de brotes
-por noticias.** El módulo está listo y el panel dice «esta fuente no devolvió
-nada» en vez de quedarse en blanco.
+Lo que aprendimos y ya está corregido en el módulo:
+
+- Los términos con `OR` **van entre paréntesis** o la API responde en texto plano:
+  `"Queries containing OR'd terms must be surrounded by ()."`
+- Las consultas ahora usan **términos sueltos en AND** (GDELT los une con AND
+  implícito) y la frase exacta solo como alternativa del `OR`:
+  `(roya OR "coffee leaf rust" OR "Hemileia vastatrix") (cafe OR café OR coffee)`.
+  Ningún tema de enfermedad va sin el término del cultivo, por el ruido.
+- **DOC 2.0 cubre una ventana reciente**: pedir `timespan=24months` no sirve. El
+  valor por defecto del módulo bajó de 12 a **3 meses**.
+
+> **Queda sin confirmar, y hay que decirlo así:** las consultas corregidas **no
+> se pudieron probar** porque de tanto probar la API durante el día nuestra IP
+> quedó en HTTP 429. **Volver a correr `npm run probar-fuentes` en frío** para
+> separar «sin cobertura» de «IP limitada».
+>
+> **Para el pitch: no prometer el mapa de brotes por noticias.** El módulo está
+> listo y el panel dice «esta fuente no devolvió nada» en vez de quedarse en
+> blanco, pero todavía no tenemos una sola noticia de roya en la mano.
 
 Invariantes que el módulo cumple, y que además están **en la base de datos** como
 `check` (`0001_esquema_inicial.sql`): una noticia **nunca** es veredicto del

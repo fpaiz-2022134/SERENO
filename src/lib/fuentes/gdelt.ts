@@ -8,9 +8,34 @@
  *     Por eso el tema "precio" lleva `noEsCotizacion: true`.
  *  3. Se deduplica por URL y por titulo normalizado.
  *
- * Limite verificado: GDELT responde HTTP 429 con el texto "Please limit requests
- * to one every 5 seconds". El modulo serializa las peticiones con 5.5 s entre
- * una y otra, y cachea 30 min.
+ * ===================== LO QUE APRENDIMOS PROBANDOLA =====================
+ * Verificado con peticiones reales el 21 nov 2026:
+ *
+ *  · LIMITE: responde HTTP 429 con "Please limit requests to one every 5
+ *    seconds". El modulo serializa con 5.5 s entre peticiones y cachea 30 min.
+ *    Probando la API muchas veces en un dia la IP queda limitada un buen rato.
+ *
+ *  · LOS `OR` VAN ENTRE PARENTESIS, si no responde en texto plano:
+ *    "Queries containing OR'd terms must be surrounded by ()."
+ *
+ *  · LA API FUNCIONA. Consulta de control `query=guatemala&timespan=1week`:
+ *    5 articulos, incluido uno de prensalibre.com sobre la oferta de cafe de
+ *    Guatemala. O sea: cuando una consulta devuelve 0, NO es que la fuente
+ *    este caida.
+ *
+ *  · LAS FRASES EXACTAS NO TRAEN NADA. `"roya del cafe"`, `"roya del café"`,
+ *    `"coffee leaf rust"` y `"precio del café"` devolvieron 0 articulos en
+ *    ventanas de 1 semana a 24 meses. Por eso las consultas de abajo usan
+ *    TERMINOS SUELTOS en AND (GDELT une los terminos con AND implicito), que
+ *    es mucho mas ancho, y la frase exacta solo como una alternativa del OR.
+ *
+ *  · El termino `roya` solo, sin `cafe`, trae ruido (un articulo de cine por
+ *    el apellido Malek/"roya"). Por eso ningun tema de enfermedad va sin el
+ *    termino del cultivo.
+ *
+ *  · DOC 2.0 cubre una ventana reciente: pedir `timespan=24months` no sirve de
+ *    nada. El valor por defecto de este modulo es 3 meses.
+ * ========================================================================
  */
 
 import {
@@ -56,15 +81,17 @@ interface DefinicionTema {
  * subir Guatemala.
  */
 export const TEMAS: Readonly<Record<TemaNoticia, DefinicionTema>> = {
-  roya: { consulta: '("roya del cafe" OR "roya del café" OR "coffee leaf rust" OR "Hemileia vastatrix")' },
-  broca: { consulta: '("broca del cafe" OR "broca del café" OR "coffee berry borer" OR "Hypothenemus hampei")' },
-  ojo_de_gallo: { consulta: '("ojo de gallo" OR "Mycena citricolor")' },
-  sequia: { consulta: '(sequia OR sequía OR canicula OR canícula) (cafe OR café OR agricultura)' },
+  // Terminos sueltos en AND (GDELT los une con AND implicito) + la frase exacta
+  // como alternativa. Nunca el nombre de la enfermedad solo: trae ruido.
+  roya: { consulta: '(roya OR "coffee leaf rust" OR "Hemileia vastatrix") (cafe OR café OR coffee)' },
+  broca: { consulta: '(broca OR "coffee berry borer" OR "Hypothenemus hampei") (cafe OR café OR coffee)' },
+  ojo_de_gallo: { consulta: '("ojo de gallo" OR "Mycena citricolor") (cafe OR café OR cafetal)' },
+  sequia: { consulta: '(sequia OR sequía OR canicula OR canícula OR drought) (cafe OR café OR cafetal OR agricultura)' },
   precio_cafe: {
-    consulta: '("precio del cafe" OR "precio del café" OR "precios del cafe" OR "coffee prices")',
+    consulta: '(precio OR precios OR cotizacion OR cotización OR prices) (cafe OR café OR coffee)',
     noEsCotizacion: true,
   },
-  exportaciones: { consulta: '(exportaciones OR exportacion OR exportación) (cafe OR café)' },
+  exportaciones: { consulta: '(exportaciones OR exportacion OR exportación OR exports) (cafe OR café OR coffee)' },
 } as const;
 
 /** Paises que suben en el ordenamiento. GDELT los nombra en ingles. */
@@ -138,7 +165,7 @@ export async function noticiasPorTema(
   tema: TemaNoticia,
   opciones: { meses?: number; maximo?: number } = {},
 ): Promise<ResultadoFuente<Noticia[]>> {
-  const { meses = 12, maximo = 40 } = opciones;
+  const { meses = 3, maximo = 40 } = opciones;
   const def = TEMAS[tema];
   const url = urlConsulta(def.consulta, meses, maximo);
   const clave = `gdelt:${url}`;

@@ -24,7 +24,7 @@ export async function GET(peticion: Request) {
 
   const noticias = conNoticias
     ? await noticiasAgro(["roya", "precio_cafe", "exportaciones"], {
-        meses: 12,
+        meses: 3,
         maximoPorTema: 15,
       })
     : { noticias: [], errores: [], consultas: [] };
