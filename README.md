@@ -541,6 +541,51 @@ curl "http://localhost:3000/api/fuentes?probar=1&lat=14.50&lon=-91.15"
 
 ---
 
+## Desplegar en Vercel
+
+El proyecto es Next.js sin nada raro: Vercel lo detecta solo. Hay `vercel.json`
+con la región `iad1` (la misma de la base en Neon, para que la latencia no se
+sume) y las cabeceras del service worker.
+
+### Variables de entorno que hay que poner en Vercel
+
+**Ninguna de las seis fuentes de datos necesita llave**, así que el clima, la
+prevención, el mercado y el histórico funcionan **sin configurar nada**. Las
+variables son solo para la base:
+
+| Variable | Para qué | ¿Obligatoria? |
+|---|---|---|
+| `DATABASE_URL_POOLED` | conexión **del pooler** de Neon (la del host con `-pooler`), rol dueño. En serverless cada invocación abre conexiones nuevas: sin pooler se agota el límite | solo para guardar |
+| `DATABASE_URL` | conexión **directa**, rol dueño. Para migraciones | no en runtime |
+| `DATABASE_URL_APP` | rol `sereno_app`, el único al que se le aplica el RLS | solo para atender a un productor |
+
+Los valores están en el `.env.local` de quien montó la base, o se sacan de la
+consola de Neon (proyecto `sereno`). **No están en el repo y no deben estarlo.**
+
+> Si no se configura ninguna, la app arranca igual: lo único que deja de
+> funcionar es `/api/historico?guardar=1`, que responderá diciendo qué falta en
+> vez de romperse.
+
+### Conectar el repositorio
+
+1. En [vercel.com/new](https://vercel.com/new), **Import Git Repository** y
+   autorizar GitHub para `fpaiz-2022134/SERENO`.
+2. Framework: **Next.js** (lo detecta solo). No cambiar el directorio raíz ni
+   los comandos de build.
+3. Pegar las variables de arriba en **Environment Variables**.
+4. **Production Branch:** `main` si ya se integró el PR; mientras tanto,
+   `backend/motor-y-fuentes`, que es la rama que tiene la UI y el backend juntos.
+
+### Lo que hay que mirar después del primer despliegue
+
+- `/api/fuentes?probar=1&lat=14.50&lon=-91.15` — dice, fuente por fuente, cuál
+  respondió desde el servidor de Vercel. Es la forma rápida de ver si alguna
+  falla por la IP del despliegue y no por el código.
+- **GDELT puede dar 429** desde Vercel igual que en local. Está contemplado: la
+  respuesta lo dice en vez de romperse.
+- **Open-Meteo sin llave tiene límite de uso.** Para el pitch conviene no
+  recargar en vivo muchas veces seguidas.
+
 ## Estructura
 
 ```
