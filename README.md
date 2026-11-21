@@ -130,49 +130,57 @@ que devuelve met.no y la usa como TTL de caché.
 **Queda descartada para el motor** —sin punto de rocío y sin histórico— y se usa
 solo para comparar: `/api/clima?...&comparar=1`.
 
-### 3 · GDELT DOC 2.0 — ⚠️ **integrada y funcional; las consultas de roya no traen cobertura**
+### 3 · GDELT DOC 2.0 — ⚠️ **integrada y funcional. NO hay cobertura de roya**
 
 | | |
 |---|---|
 | Endpoint | `api.gdeltproject.org/api/v2/doc/doc` |
 | Límite | **1 petición cada 5 s** (devuelve HTTP 429 con ese texto). El módulo serializa con 5.5 s y cachea 30 min |
-| Temas | roya, broca, ojo de gallo, sequía, precio del café, exportaciones |
+| Ventana | DOC 2.0 cubre poco hacia atrás: el módulo pide **3 meses** |
 | Dedup | por URL y por título normalizado; Guatemala y Centroamérica suben en el orden |
 
-**La API funciona — eso está probado.** Consulta de control
-`query=guatemala&timespan=1week`: **5 artículos**, entre ellos uno de
-`prensalibre.com` sobre la oferta de café de Guatemala. Así que cuando una
-consulta devuelve 0, **no es que la fuente esté caída**.
+**El veredicto, con las consultas ya corregidas y respuesta HTTP 200:**
 
-**Lo que no trae nada son las frases exactas.** `"roya del cafe"`,
-`"roya del café"`, `"coffee leaf rust"` y `"precio del café"` devolvieron
-**0 artículos** en ventanas de 1 semana a 24 meses. Y el término `roya` solo, sin
-`cafe`, trae ruido (devolvió un artículo de cine).
+| Tema | Artículos |
+|---|---|
+| `roya` | **0** |
+| `broca` | **0** |
+| `ojo_de_gallo` | **0** |
+| `sequia` | **0** |
+| `precio_cafe` | pendiente de confirmar |
+| `exportaciones` | pendiente de confirmar |
 
-Lo que aprendimos y ya está corregido en el módulo:
+**Esto descarta las dos explicaciones fáciles**, y por eso se puede afirmar:
 
-- Los términos con `OR` **van entre paréntesis** o la API responde en texto plano:
-  `"Queries containing OR'd terms must be surrounded by ()."`
-- Las consultas ahora usan **términos sueltos en AND** (GDELT los une con AND
-  implícito) y la frase exacta solo como alternativa del `OR`:
-  `(roya OR "coffee leaf rust" OR "Hemileia vastatrix") (cafe OR café OR coffee)`.
-  Ningún tema de enfermedad va sin el término del cultivo, por el ruido.
-- **DOC 2.0 cubre una ventana reciente**: pedir `timespan=24months` no sirve. El
-  valor por defecto del módulo bajó de 12 a **3 meses**.
+- **No es la sintaxis.** Las consultas corregidas son válidas y GDELT las aceptó
+  con 200. Lo que sí aprendimos: los `OR` **van entre paréntesis** o responde en
+  texto plano (`"Queries containing OR'd terms must be surrounded by ()."`), y las
+  **frases exactas** (`"roya del cafe"`, `"coffee leaf rust"`) no traen nada, así
+  que las consultas usan términos sueltos en AND.
+- **No es nuestra IP.** El 429 aparece y desaparece entre intentos, pero cuando la
+  petición pasa, pasa con **200 y cero resultados**. La consulta de control
+  `query=guatemala&timespan=1week` devolvió **5 artículos**, uno de
+  `prensalibre.com` sobre la oferta de café de Guatemala: la fuente funciona.
+- **Tampoco es el término suelto.** `roya` sin `cafe` sí devuelve algo, pero es
+  ruido (un artículo de cine). Por eso ningún tema de enfermedad consulta sin el
+  término del cultivo, y hay una prueba que lo exige.
 
-> **Queda sin confirmar, y hay que decirlo así:** las consultas corregidas **no
-> se pudieron probar** porque de tanto probar la API durante el día nuestra IP
-> quedó en HTTP 429. **Volver a correr `npm run probar-fuentes` en frío** para
-> separar «sin cobertura» de «IP limitada».
+> ## 📰 **Lo que hay que decir en el pitch**
 >
-> **Para el pitch: no prometer el mapa de brotes por noticias.** El módulo está
-> listo y el panel dice «esta fuente no devolvió nada» en vez de quedarse en
-> blanco, pero todavía no tenemos una sola noticia de roya en la mano.
+> **GDELT no tiene cobertura de roya, broca ni ojo de gallo del café en los
+> últimos 3 meses.** El módulo funciona, la fuente responde, y no hay noticias que
+> traer. Es un hueco **de la fuente**, no un bug nuestro.
+>
+> Por lo tanto: **la feature #5 (mapa de brotes por noticias) queda fuera del
+> MVP** y no se promete. El panel dice «esta fuente no devolvió nada» en vez de
+> quedarse en blanco.
+>
+> Un hueco declarado es útil. Mostrar un mapa de brotes vacío en el demo, no.
 
 Invariantes que el módulo cumple, y que además están **en la base de datos** como
-`check` (`0001_esquema_inicial.sql`): una noticia **nunca** es veredicto del
-motor (`es_veredicto = false` forzado), y una noticia de precios **nunca** es una
-cotización (`noEsCotizacion: true`).
+`check` (`0002_rls.sql` no da permiso de escritura, y `0001` fuerza
+`es_veredicto = false`): una noticia **nunca** es veredicto del motor, y una
+noticia de precios **nunca** es una cotización (`noEsCotizacion: true`).
 
 ### 4 · NASA POWER — ✅ **integrada como respaldo histórico**
 
