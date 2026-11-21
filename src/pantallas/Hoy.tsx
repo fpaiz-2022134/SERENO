@@ -24,7 +24,7 @@ import { AvisoEstimacion, AvisoSinConexion, Imprenta, Rotulo, Vacio } from "@/co
 import { Flecha, Gota, Hoja, Regla } from "@/componentes/Iconos";
 import { diasEntre, pinta } from "@/lib/ui/paleta";
 import { fechaCorta, fechaDeHoy } from "@/lib/ui/fechas";
-import type { Parcela } from "@/lib/ui/almacen";
+import type { Parcela } from "@/lib/ui/cuenta";
 import type { RespuestaPrevencion } from "@/lib/ui/tipos";
 import type { Resultado } from "@/lib/ui/red";
 
@@ -54,7 +54,10 @@ export function Hoy({
   const d = resultado.datos;
   const curva = d.curva ?? [];
   const ventana = d.ventanaDeAccion;
-  const conMotor = parcela.cultivo === "cafe";
+  // El esquema de parcelas es de cafe (variedades de cafe, roya) y el motor
+  // tambien. Mientras no haya umbrales verificados de otro cultivo, no hay
+  // parcela que pueda estar en otro cultivo.
+  const conMotor = true;
 
   const [diaElegido, setDiaElegido] = useState(d.hoy);
   const dia = useMemo(
@@ -264,7 +267,7 @@ export function Hoy({
         ) : (
           <section className="seccion">
             <Vacio
-              que={`Riesgo · ${parcela.cultivo}`}
+              que="Riesgo de plaga"
               falta="El motor solo tiene umbrales verificados para roya del café. Para este cultivo no hay umbrales en fuente primaria y no vamos a inventarlos."
             />
             <button

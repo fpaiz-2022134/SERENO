@@ -1,13 +1,13 @@
 /**
- * El armazón de la PWA, v2.
+ * El armazón de la PWA.
  *
  * Una sola página con las pantallas en estado del cliente, a propósito: así el
- * service worker cachea UN documento y la app abre completa sin conexión, sin
- * pedirle al servidor la carga parcial de ninguna ruta.
+ * service worker cachea UN documento y la app abre completa sin conexión.
  *
- * Aquí también se fija `data-riesgo` en el <html>. De esa forma el color del
- * riesgo baja por variables CSS a toda la app —incluido el botón de la barra—
- * y no hay que pasarlo por props a cada componente.
+ * LA CUENTA VIVE EN EL SERVIDOR. Al abrir se pregunta `/api/cuenta`; si la
+ * petición falla POR RED se usa la instantánea guardada en el teléfono y la
+ * app sigue funcionando en modo lectura, con la fecha a la vista. Si el
+ * servidor responde que no hay sesión, manda el servidor.
  */
 "use client";
 
@@ -15,7 +15,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Gota } from "@/componentes/Iconos";
 import { Navegacion, type Vista } from "@/componentes/Navegacion";
 import { Acceso } from "@/pantallas/Acceso";
-import { ConfirmarCorreo } from "@/pantallas/ConfirmarCorreo";
 import { SinParcela } from "@/pantallas/SinParcela";
 import { Hoy } from "@/pantallas/Hoy";
 import { MiParcela } from "@/pantallas/MiParcela";
@@ -26,20 +25,25 @@ import { Vacio } from "@/componentes/Avisos";
 import { marcaDeTiempo } from "@/lib/ui/fechas";
 import { pinta } from "@/lib/ui/paleta";
 import {
-  borrarParcela,
-  borrarSesion,
+  borrarTodoLoLocal,
   guardarAccionesHechas,
-  guardarParcela,
-  guardarSesion,
+  guardarInstantanea,
   leerAccionesHechas,
   leerCostos,
-  leerParcela,
-  leerSesion,
-  nombreDesdeCorreo,
+  leerInstantanea,
   type Costos,
-  type Parcela,
-  type Sesion,
 } from "@/lib/ui/almacen";
+import {
+  guardarParcela,
+  guardarParcelaNueva,
+  leerCuenta,
+  nombreDePila,
+  salir as salirDeLaCuenta,
+  type EstadoCuenta,
+  type Parcela,
+  type ParcelaNueva,
+  type Sesion,
+} from "@/lib/ui/cuenta";
 import {
   SinDatos,
   clavePrevencion,
@@ -49,13 +53,15 @@ import {
 } from "@/lib/ui/red";
 import type { RespuestaPrevencion } from "@/lib/ui/tipos";
 
-type Paso = "cargando" | "acceso" | "codigo" | "app";
+type Paso = "cargando" | "acceso" | "app";
 
 export function App() {
   const [paso, setPaso] = useState<Paso>("cargando");
-  const [correoPendiente, setCorreoPendiente] = useState("");
   const [sesion, setSesion] = useState<Sesion | null>(null);
-  const [parcela, setParcela] = useState<Parcela | null>(null);
+  const [parcelas, setParcelas] = useState<Parcela[]>([]);
+  const [baseConfigurada, setBaseConfigurada] = useState(true);
+  /** true = la cuenta se leyó de la copia del teléfono, no del servidor. */
+  const [cuentaDeCache, setCuentaDeCache] = useState(false);
   const [vista, setVista] = useState<Vista>("hoy");
 
   const [reporte, setReporte] = useState<Res<RespuestaPrevencion> | null>(null);
@@ -66,27 +72,54 @@ export function App() {
   const [costos, setCostos] = useState<Costos | null>(null);
   const [enLinea, setEnLinea] = useState(true);
 
-  /* --- arranque: leer lo que ya está en el teléfono ----------------- */
+  const parcela = parcelas[0] ?? null;
+
+  /* --- arranque ------------------------------------------------------ */
   useEffect(() => {
-    const s = leerSesion();
-    setSesion(s);
-    setParcela(leerParcela());
     setLabores(leerAccionesHechas());
     setCostos(leerCostos());
-    setPaso(s?.correoConfirmado ? "app" : "acceso");
     setEnLinea(navigator.onLine);
 
     const sube = () => setEnLinea(true);
     const baja = () => setEnLinea(false);
     window.addEventListener("online", sube);
     window.addEventListener("offline", baja);
+
+    (async () => {
+      try {
+        const estado = await leerCuenta();
+        setBaseConfigurada(estado.baseConfigurada);
+        setCuentaDeCache(false);
+        if (estado.sesion) {
+          setSesion(estado.sesion);
+          setParcelas(estado.parcelas);
+          guardarInstantanea(estado.sesion, estado.parcelas);
+          setPaso("app");
+        } else {
+          // El servidor manda: si dice que no hay sesión, no hay sesión.
+          setPaso("acceso");
+        }
+      } catch {
+        // Falló por red. Si hay copia en el teléfono, se abre con ella.
+        const copia = leerInstantanea<Sesion, Parcela>();
+        if (copia?.sesion) {
+          setSesion(copia.sesion);
+          setParcelas(copia.parcelas);
+          setCuentaDeCache(true);
+          setPaso("app");
+        } else {
+          setPaso("acceso");
+        }
+      }
+    })();
+
     return () => {
       window.removeEventListener("online", sube);
       window.removeEventListener("offline", baja);
     };
   }, []);
 
-  /* --- service worker ----------------------------------------------- */
+  /* --- service worker ------------------------------------------------- */
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {
@@ -95,31 +128,41 @@ export function App() {
     }
   }, []);
 
-  /* --- el color del riesgo, una vez, en el documento ----------------- */
+  /* --- el color del riesgo, una vez, en el documento ------------------- */
   const nivel = reporte?.datos.ventanaDeAccion?.nivel ?? reporte?.datos.curva?.[0]?.nivel ?? null;
 
   useEffect(() => {
     const raiz = document.documentElement;
-    if (nivel && parcela?.cultivo === "cafe") raiz.setAttribute("data-riesgo", nivel);
+    if (nivel) raiz.setAttribute("data-riesgo", nivel);
     else raiz.removeAttribute("data-riesgo");
-  }, [nivel, parcela?.cultivo]);
+  }, [nivel]);
 
-  /* --- consultar el pronóstico --------------------------------------- */
+  /* --- pronóstico ------------------------------------------------------ */
   const consultar = useCallback(async (p: Parcela) => {
     setCargando(true);
     setErrorReporte(null);
     try {
       const r = await pedirConRespaldo<RespuestaPrevencion>(
         clavePrevencion(p.latitud, p.longitud),
-        rutaPrevencion(p),
+        rutaPrevencion({
+          latitud: p.latitud,
+          longitud: p.longitud,
+          nombre: p.nombre,
+          ultimaAplicacion: p.ultimaAplicacion,
+        }),
       );
       setReporte(r);
-      // La altitud la mide la fuente; si cambió, se guarda en la parcela.
+
+      // La altitud la mide la fuente. Si cambió, se guarda en la parcela, en
+      // el servidor — no solo en la pantalla.
       const alt = r.datos.punto?.altitudMetros ?? null;
-      if (alt != null && alt !== p.altitudMetros) {
-        const actualizada = { ...p, altitudMetros: alt };
-        guardarParcela(actualizada);
-        setParcela(actualizada);
+      if (r.origen === "red" && alt != null && alt !== p.altitudMetros) {
+        try {
+          const actualizada = await guardarParcela(p.id, { ...p, altitudMetros: alt });
+          setParcelas((xs) => xs.map((x) => (x.id === p.id ? actualizada : x)));
+        } catch {
+          /* si no se pudo guardar, la pantalla sigue usando la medida de hoy */
+        }
       }
     } catch (e) {
       setErrorReporte(e instanceof SinDatos ? e.message : "No se pudo consultar el pronóstico.");
@@ -131,44 +174,54 @@ export function App() {
 
   useEffect(() => {
     if (paso === "app" && parcela) void consultar(parcela);
-    // Solo por coordenada y fecha de aplicación: renombrar no vuelve a pedir.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paso, parcela?.latitud, parcela?.longitud, parcela?.ultimaAplicacion]);
+  }, [paso, parcela?.id, parcela?.latitud, parcela?.longitud, parcela?.ultimaAplicacion]);
 
-  const nombre = useMemo(() => sesion?.nombre ?? "productor", [sesion]);
+  const nombre = useMemo(() => (sesion ? nombreDePila(sesion) : "productor"), [sesion]);
 
-  /* --- sesión --------------------------------------------------------- */
-  function entrar(correo: string) {
-    setCorreoPendiente(correo);
-    setPaso("codigo");
-  }
-
-  function confirmar() {
-    const s: Sesion = {
-      correo: correoPendiente,
-      nombre: nombreDesdeCorreo(correoPendiente),
-      correoConfirmado: true,
-      soloLocal: true,
-      creadaEn: new Date().toISOString(),
-    };
-    guardarSesion(s);
-    setSesion(s);
+  /* --- cuenta ---------------------------------------------------------- */
+  function entrar(estado: EstadoCuenta) {
+    setSesion(estado.sesion);
+    setParcelas(estado.parcelas);
+    setCuentaDeCache(false);
+    if (estado.sesion) guardarInstantanea(estado.sesion, estado.parcelas);
     setPaso("app");
     setVista("hoy");
   }
 
-  function salir() {
-    borrarSesion();
-    borrarParcela();
+  async function salir() {
+    await salirDeLaCuenta();
+    // Se borra TODO lo del teléfono: el reporte de la parcela de alguien no
+    // tiene por qué quedarse para el siguiente que entre.
+    borrarTodoLoLocal();
     setSesion(null);
-    setParcela(null);
+    setParcelas([]);
     setReporte(null);
+    setLabores([]);
+    setCostos(null);
     setPaso("acceso");
   }
 
-  function guardar(p: Parcela) {
-    guardarParcela(p);
-    setParcela(p);
+  /* --- parcela --------------------------------------------------------- */
+  const [guardandoParcela, setGuardandoParcela] = useState(false);
+  const [errorParcela, setErrorParcela] = useState<string | null>(null);
+
+  async function guardar(datos: ParcelaNueva, id: string | null): Promise<boolean> {
+    setGuardandoParcela(true);
+    setErrorParcela(null);
+    try {
+      const p = id ? await guardarParcela(id, datos) : await guardarParcelaNueva(datos);
+      const nuevas = id ? parcelas.map((x) => (x.id === id ? p : x)) : [...parcelas, p];
+      setParcelas(nuevas);
+      if (sesion) guardarInstantanea(sesion, nuevas);
+      setCuentaDeCache(false);
+      return true;
+    } catch (e) {
+      setErrorParcela(e instanceof Error ? e.message : "No se pudo guardar la parcela.");
+      return false;
+    } finally {
+      setGuardandoParcela(false);
+    }
   }
 
   function marcarLabor(id: string) {
@@ -187,16 +240,8 @@ export function App() {
     );
   }
 
-  if (paso === "acceso") return <Acceso alEntrar={entrar} />;
-
-  if (paso === "codigo") {
-    return (
-      <ConfirmarCorreo
-        correo={correoPendiente}
-        alConfirmar={confirmar}
-        alVolver={() => setPaso("acceso")}
-      />
-    );
+  if (paso === "acceso" || !sesion) {
+    return <Acceso alEntrar={entrar} baseConfigurada={baseConfigurada} />;
   }
 
   const cuerpo = (() => {
@@ -205,14 +250,25 @@ export function App() {
         <MiParcela
           parcela={parcela}
           altitudMedida={reporte?.datos.punto?.altitudMetros ?? null}
+          guardando={guardandoParcela}
+          error={errorParcela}
+          soloLectura={cuentaDeCache}
           alGuardar={guardar}
           alCalcular={() => setVista("resultado")}
         />
       );
     }
 
-    if (vista === "perfil" && sesion) {
-      return <Perfil sesion={sesion} parcela={parcela} resultado={reporte} alSalir={salir} />;
+    if (vista === "perfil") {
+      return (
+        <Perfil
+          sesion={sesion}
+          parcela={parcela}
+          resultado={reporte}
+          sinConexion={cuentaDeCache}
+          alSalir={salir}
+        />
+      );
     }
 
     if (vista === "alertas") return <Alertas resultado={reporte} />;
@@ -221,9 +277,6 @@ export function App() {
       return <SinParcela nombre={nombre} alConfigurar={() => setVista("parcela")} />;
     }
 
-    // Mientras no haya reporte: o estamos consultando, o falló de verdad. No se
-    // muestra "No disponible" por el hueco entre guardar la parcela y que salga
-    // la petición.
     if (!reporte && !errorReporte) {
       return (
         <div className="cargando">
@@ -306,10 +359,22 @@ export function App() {
         </div>
       </header>
 
+      {cuentaDeCache && (
+        <div className="pliego" style={{ paddingBottom: 0 }}>
+          <div className="nota" role="status">
+            <span className="nota__signo" aria-hidden="true">
+              ◇
+            </span>
+            <span>
+              <b>Sin conexión con el servidor.</b> Está viendo la copia de su cuenta que
+              quedó en este teléfono. Para cambiar la parcela hace falta señal.
+            </span>
+          </div>
+        </div>
+      )}
+
       {cuerpo}
 
-      {/* El medidor de riesgo también vive en la barra: desde cualquier
-          pantalla se ve en qué banda está la parcela. */}
       <span className="sr" aria-live="polite">
         {nivel ? `Riesgo actual: ${p.corta}, ${p.palabra}` : "Riesgo no disponible"}
       </span>

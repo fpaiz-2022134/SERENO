@@ -8,7 +8,7 @@
 
 import { Rotulo } from "@/componentes/Avisos";
 import { marcaDeTiempo } from "@/lib/ui/fechas";
-import type { Parcela, Sesion } from "@/lib/ui/almacen";
+import { nombreDeVariedad, type Parcela, type Sesion } from "@/lib/ui/cuenta";
 import type { RespuestaPrevencion } from "@/lib/ui/tipos";
 import type { Resultado } from "@/lib/ui/red";
 
@@ -33,11 +33,13 @@ export function Perfil({
   sesion,
   parcela,
   resultado,
+  sinConexion,
   alSalir,
 }: {
   sesion: Sesion;
   parcela: Parcela | null;
   resultado: Resultado<RespuestaPrevencion> | null;
+  sinConexion: boolean;
   alSalir: () => void;
 }) {
   return (
@@ -51,8 +53,10 @@ export function Perfil({
         <Rotulo>Cuenta</Rotulo>
         <p style={{ fontSize: 15, margin: 0, color: "var(--tinta-2)" }}>{sesion.correo}</p>
         <p className="imprenta">
-          Sesión guardada solo en este teléfono desde {marcaDeTiempo(sesion.creadaEn)}. No hay
-          cuenta en la nube: esta versión no tiene servidor de identidad.
+          Su cuenta vive en la base de datos del servidor. La contraseña se guarda
+          hasheada con scrypt y la sesión viaja en una cookie que este código no puede
+          leer. Cerrar sesión la borra también del servidor, no solo de este teléfono.
+          {sinConexion && " Ahora mismo no hay conexión con el servidor: está viendo la copia local."}
         </p>
         <button type="button" className="boton boton--musgo" onClick={alSalir} style={{ marginTop: 12 }}>
           Cerrar sesión y borrar los datos de este teléfono
@@ -73,7 +77,7 @@ export function Perfil({
               fontVariantNumeric: "tabular-nums",
             }}
           >
-            {parcela.latitud}, {parcela.longitud}
+            {parcela.latitud}, {parcela.longitud} · café {nombreDeVariedad(parcela.variedadId).toLowerCase()}
             {parcela.altitudMetros != null && ` · ${Math.round(parcela.altitudMetros)} m`}
           </p>
         </section>

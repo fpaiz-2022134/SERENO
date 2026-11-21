@@ -1,39 +1,68 @@
 /**
- * Portada · Acceso — solo correo y contraseña.
+ * Acceso y registro — cuentas de verdad.
  *
- * El nombre ocupa media pantalla porque es lo único que hay que entender
- * aquí. El fondo es la luz entre las hojas, dibujada con gradientes: pesa
- * cero y respira despacio.
+ * Una sola pantalla con dos modos, porque para un productor que abre la app
+ * por primera vez «crear cuenta» e «iniciar sesión» son la misma intención:
+ * entrar. Que la contraseña vaya a `/api/cuenta/registro` o a
+ * `/api/cuenta/acceso` es un detalle del servidor, no una decisión suya.
  *
- * HONESTIDAD: no hay servidor de identidad. La sesión se guarda solo en este
- * teléfono y la pantalla lo dice en letra visible, porque simular que valida
- * sería exactamente la clase de mentira que el equipo acordó no hacer.
+ * La contraseña viaja a un endpoint propio sobre HTTPS, se guarda hasheada con
+ * scrypt y la sesión vuelve en una cookie `HttpOnly`. Ya no hay nada que
+ * advertir aquí: esta pantalla sí valida contra el servidor.
  */
 "use client";
 
 import { useState } from "react";
 import { Gota } from "@/componentes/Iconos";
 import { FOTOS } from "@/componentes/Fotos";
+import { entrar, registrarse, type EstadoCuenta } from "@/lib/ui/cuenta";
 
-export function Acceso({ alEntrar }: { alEntrar: (correo: string) => void }) {
+type Modo = "entrar" | "crear";
+
+export function Acceso({
+  alEntrar,
+  baseConfigurada,
+}: {
+  alEntrar: (estado: EstadoCuenta) => void;
+  baseConfigurada: boolean;
+}) {
+  const [modo, setModo] = useState<Modo>("entrar");
   const [correo, setCorreo] = useState("");
   const [clave, setClave] = useState("");
+  const [nombre, setNombre] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
 
-  const valido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo) && clave.length >= 6;
-
-  function enviar(e: React.FormEvent) {
+  async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    if (!valido) {
-      setError(
-        correo.includes("@")
-          ? "La contraseña necesita al menos 6 caracteres."
-          : "Escriba un correo electrónico válido.",
-      );
+    if (enviando) return;
+    setError(null);
+
+    const limpio = correo.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(limpio)) {
+      setError("Escriba un correo electrónico válido.");
       return;
     }
-    setError(null);
-    alEntrar(correo.trim().toLowerCase());
+    if (clave.length === 0) {
+      setError("Escriba su contraseña.");
+      return;
+    }
+    if (modo === "crear" && clave.length < 8) {
+      setError("La contraseña necesita al menos 8 caracteres.");
+      return;
+    }
+
+    setEnviando(true);
+    try {
+      const estado =
+        modo === "crear"
+          ? await registrarse({ correo: limpio, clave, nombre: nombre.trim() || undefined })
+          : await entrar({ correo: limpio, clave });
+      alEntrar(estado);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo entrar.");
+      setEnviando(false);
+    }
   }
 
   return (
@@ -53,6 +82,48 @@ export function Acceso({ alEntrar }: { alEntrar: (correo: string) => void }) {
       </div>
 
       <form onSubmit={enviar} noValidate>
+        {!baseConfigurada && (
+          <div className="nota nota--alta" style={{ marginBottom: 14 }}>
+            <span className="nota__signo" aria-hidden="true">!</span>
+            <span>
+              <b>El servidor no tiene base de datos configurada.</b> No se pueden crear
+              cuentas ahora mismo.
+            </span>
+          </div>
+        )}
+
+        <div className="fichas entra entra-3" style={{ marginBottom: 14 }}>
+          <button
+            type="button"
+            className="ficha"
+            aria-pressed={modo === "entrar"}
+            onClick={() => { setModo("entrar"); setError(null); }}
+          >
+            Ya tengo cuenta
+          </button>
+          <button
+            type="button"
+            className="ficha"
+            aria-pressed={modo === "crear"}
+            onClick={() => { setModo("crear"); setError(null); }}
+          >
+            Crear cuenta
+          </button>
+        </div>
+
+        {modo === "crear" && (
+          <label className="campo entra entra-3">
+            <span className="campo__que">Su nombre (opcional)</span>
+            <input
+              type="text"
+              autoComplete="name"
+              placeholder="Ana Ramírez"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+            />
+          </label>
+        )}
+
         <label className="campo entra entra-3">
           <span className="campo__que">Correo electrónico</span>
           <input
@@ -66,10 +137,12 @@ export function Acceso({ alEntrar }: { alEntrar: (correo: string) => void }) {
         </label>
 
         <label className="campo entra entra-4">
-          <span className="campo__que">Contraseña</span>
+          <span className="campo__que">
+            Contraseña{modo === "crear" ? " · mínimo 8 caracteres" : ""}
+          </span>
           <input
             type="password"
-            autoComplete="current-password"
+            autoComplete={modo === "crear" ? "new-password" : "current-password"}
             placeholder="••••••••"
             value={clave}
             onChange={(e) => setClave(e.target.value)}
@@ -78,29 +151,25 @@ export function Acceso({ alEntrar }: { alEntrar: (correo: string) => void }) {
 
         {error && (
           <div className="nota nota--alta" role="alert" style={{ marginBottom: 12 }}>
-            <span className="nota__signo" aria-hidden="true">
-              !
-            </span>
+            <span className="nota__signo" aria-hidden="true">!</span>
             <span>{error}</span>
           </div>
         )}
 
-        <button type="submit" className="boton entra entra-5" style={{ marginTop: 4 }}>
-          Entrar
+        <button
+          type="submit"
+          className="boton entra entra-5"
+          style={{ marginTop: 4 }}
+          disabled={enviando || !baseConfigurada}
+        >
+          {enviando ? "Un momento…" : modo === "crear" ? "Crear mi cuenta" : "Entrar"}
         </button>
 
-        <p className="portada__pie">La parcela se agrega después</p>
-
-        <div className="nota" style={{ marginTop: 16 }}>
-          <span className="nota__signo" aria-hidden="true">
-            ◈
-          </span>
-          <span>
-            <b>Esta pantalla no valida contra un servidor.</b> En esta versión la sesión se
-            guarda solo en este teléfono: no hay cuentas en la nube ni se envía ningún
-            correo. Lo decimos en vez de simularlo.
-          </span>
-        </div>
+        <p className="portada__pie">
+          {modo === "crear"
+            ? "La parcela se agrega después"
+            : "Su sesión queda abierta 30 días en este teléfono"}
+        </p>
       </form>
     </div>
   );

@@ -12,7 +12,7 @@ import { Rotulo, Vacio } from "@/componentes/Avisos";
 export function SinParcela({ nombre, alConfigurar }: { nombre: string; alConfigurar: () => void }) {
   return (
     <>
-      <Cabecera foto={FOTOS.cafetal} titulo={`Bienvenida, ${nombre}.`} />
+      <Cabecera foto={FOTOS.cafetal} titulo={`Hola, ${nombre}.`} />
 
       <div className="pliego">
         <section className="tarjeta entra entra-1" style={{ position: "relative", zIndex: 2 }}>

@@ -15,7 +15,8 @@ import { AvisoSinConexion, Imprenta, Rotulo } from "@/componentes/Avisos";
 import { Compartir, Guardar } from "@/componentes/Iconos";
 import { diasEntre, pinta } from "@/lib/ui/paleta";
 import { fechaCompleta, fechaCorta, fechaLarga } from "@/lib/ui/fechas";
-import { agregarSeguimiento, guardarCostos, type Costos, type Parcela } from "@/lib/ui/almacen";
+import { agregarSeguimiento, guardarCostos, type Costos } from "@/lib/ui/almacen";
+import { nombreDeVariedad, type Parcela } from "@/lib/ui/cuenta";
 import type { RespuestaPrevencion } from "@/lib/ui/tipos";
 import type { Resultado as ResultadoRed } from "@/lib/ui/red";
 
@@ -93,7 +94,7 @@ export function Resultado({
     <div className="pliego">
       <div className="saludo entra entra-1">
         <div className="saludo__fecha">
-          {parcela.nombre} · café {parcela.variedad.toLowerCase()} · {parcela.areaHa} ha
+          {parcela.nombre} · café {nombreDeVariedad(parcela.variedadId).toLowerCase()} · {parcela.areaHa} ha
         </div>
         <h1 className="saludo__titulo">Resultado</h1>
       </div>
