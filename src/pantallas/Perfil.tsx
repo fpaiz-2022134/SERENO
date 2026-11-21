@@ -1,13 +1,14 @@
 /**
- * Perfil — la cuenta, las fuentes y lo que el producto NO hace.
+ * Perfil — la cuenta, de dónde sale cada dato, y lo que SERENO no hace.
  *
- * Esta última parte no es relleno: es la que evita que alguien salga del demo
- * creyendo que SERENO predice brotes o que cubre cinco cultivos.
+ * La última sección no es relleno: es la que evita que alguien salga del demo
+ * creyendo que esto predice brotes o que cubre cinco cultivos.
  */
 "use client";
 
+import { Rotulo } from "@/componentes/Avisos";
 import { marcaDeTiempo } from "@/lib/ui/fechas";
-import type { Sesion, Parcela } from "@/lib/ui/almacen";
+import { nombreDeVariedad, type Parcela, type Sesion } from "@/lib/ui/cuenta";
 import type { RespuestaPrevencion } from "@/lib/ui/tipos";
 import type { Resultado } from "@/lib/ui/red";
 
@@ -20,102 +21,102 @@ const FUENTES = [
   { n: "GDELT", q: "Responde, pero no tiene cobertura de roya: cero artículos.", ok: false },
 ];
 
+const NO_HACE = [
+  ["No predice brotes.", "Predice ventanas de condiciones favorables a la infección. En la coordenada de demo, 2012 —el año de la emergencia nacional— dio menos eventos que 2011."],
+  ["Solo roya del café.", "Maíz, frijol, cardamomo y hortalizas no tienen umbrales verificados, así que no calculan nada."],
+  ["No hay mapa de brotes por noticias.", "GDELT responde, pero devuelve cero artículos de roya: es un hueco de la fuente."],
+  ["No hay precio nacional del café.", "Los CSV del MAGA son de mercados terminales y el café no se vende ahí."],
+  ["No es un agrónomo.", "La última palabra es suya."],
+];
+
 export function Perfil({
   sesion,
   parcela,
   resultado,
+  sinConexion,
   alSalir,
 }: {
   sesion: Sesion;
   parcela: Parcela | null;
   resultado: Resultado<RespuestaPrevencion> | null;
+  sinConexion: boolean;
   alSalir: () => void;
 }) {
   return (
-    <div className="pantalla">
-      <div style={{ padding: "2px 0 10px" }}>
-        <h1 style={{ fontSize: 27, color: "var(--niebla-profunda)" }}>Perfil</h1>
+    <div className="pliego">
+      <div className="saludo entra entra-1">
+        <div className="saludo__fecha">{sesion.correo}</div>
+        <h1 className="saludo__titulo">{sesion.nombre}</h1>
       </div>
 
-      <div className="tarjeta">
-        <div className="tarjeta__rotulo">Cuenta</div>
-        <p style={{ fontSize: 15, marginTop: 8, marginBottom: 4 }}>
-          <b>{sesion.nombre}</b>
-          <br />
-          <span style={{ fontSize: 13, color: "var(--tinta-suave)" }}>{sesion.correo}</span>
+      <section className="tarjeta seccion entra entra-2">
+        <Rotulo>Cuenta</Rotulo>
+        <p style={{ fontSize: 15, margin: 0, color: "var(--tinta-2)" }}>{sesion.correo}</p>
+        <p className="imprenta">
+          Su cuenta vive en la base de datos del servidor. La contraseña se guarda
+          hasheada con scrypt y la sesión viaja en una cookie que este código no puede
+          leer. Cerrar sesión la borra también del servidor, no solo de este teléfono.
+          {sinConexion && " Ahora mismo no hay conexión con el servidor: está viendo la copia local."}
         </p>
-        <p className="nota-procedencia">
-          Sesión guardada solo en este teléfono desde {marcaDeTiempo(sesion.creadaEn)}. No hay
-          cuenta en la nube: esta versión no tiene servidor de identidad.
-        </p>
-        <button type="button" className="boton boton--contorno" onClick={alSalir}>
+        <button type="button" className="boton boton--musgo" onClick={alSalir} style={{ marginTop: 12 }}>
           Cerrar sesión y borrar los datos de este teléfono
         </button>
-      </div>
+      </section>
 
       {parcela && (
-        <div className="tarjeta seccion">
-          <div className="tarjeta__rotulo">Parcela</div>
-          <p style={{ fontSize: 14, marginTop: 8, marginBottom: 0 }}>
+        <section className="tarjeta seccion">
+          <Rotulo>Parcela</Rotulo>
+          <p style={{ fontSize: 15, margin: 0 }}>
             {parcela.nombre} · {parcela.lugar || "sin lugar"}
-            <br />
-            <span style={{ fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--tinta-suave)" }}>
-              {parcela.latitud}, {parcela.longitud}
-              {parcela.altitudMetros != null && ` · ${Math.round(parcela.altitudMetros)} m`}
-            </span>
           </p>
-        </div>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--tinta-2)",
+              margin: "4px 0 0",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {parcela.latitud}, {parcela.longitud} · café {nombreDeVariedad(parcela.variedadId).toLowerCase()}
+            {parcela.altitudMetros != null && ` · ${Math.round(parcela.altitudMetros)} m`}
+          </p>
+        </section>
       )}
 
-      <div className="tarjeta seccion">
-        <div className="tarjeta__rotulo">De dónde sale cada dato</div>
-        <div style={{ marginTop: 6 }}>
-          {FUENTES.map((f) => (
-            <div key={f.n} className="boletin">
-              <span className="boletin__titulo">
-                {f.ok ? "✓" : "○"} {f.n}
-              </span>
-              <span className="boletin__pie">{f.q}</span>
-            </div>
-          ))}
-        </div>
+      <section className="tarjeta seccion">
+        <Rotulo>De dónde sale cada dato</Rotulo>
+        {FUENTES.map((f) => (
+          <div key={f.n} className="enlace">
+            <span className="enlace__titulo">
+              <span style={{ color: f.ok ? "var(--hoja-clara)" : "var(--tinta-3)" }}>
+                {f.ok ? "●" : "○"}
+              </span>{" "}
+              {f.n}
+            </span>
+            <span className="enlace__pie">{f.q}</span>
+          </div>
+        ))}
         {resultado && (
-          <p className="nota-procedencia">
+          <p className="imprenta">
             Último reporte: {marcaDeTiempo(resultado.recibidoEn)} ·{" "}
             {resultado.origen === "red" ? "de la red" : "de la caché de este teléfono"}.
           </p>
         )}
-        <p className="nota-procedencia">
+        <p className="imprenta">
           <b>INSIVUMEH no está integrado.</b> Aparece en el material de marca, pero no es una
           de las fuentes que consulta esta app, así que no lo nombramos en los datos.
         </p>
-      </div>
+      </section>
 
-      <div className="tarjeta seccion">
-        <div className="tarjeta__rotulo">Lo que SERENO no hace</div>
-        <ul style={{ fontSize: 13, color: "var(--tinta-suave)", paddingLeft: 18, marginBottom: 0 }}>
-          <li>
-            <b>No predice brotes.</b> Predice ventanas de condiciones favorables a la
-            infección. En la coordenada de demo, 2012 —el año de la emergencia nacional— dio
-            menos eventos que 2011.
-          </li>
-          <li>
-            <b>Solo roya del café.</b> Maíz, frijol, cardamomo y hortalizas no tienen umbrales
-            verificados y por eso no calculan nada.
-          </li>
-          <li>
-            <b>No hay mapa de brotes por noticias.</b> GDELT responde, pero devuelve cero
-            artículos de roya: es un hueco de la fuente.
-          </li>
-          <li>
-            <b>No hay precio nacional del café.</b> Los CSV del MAGA son de mercados
-            terminales y el café no se vende ahí.
-          </li>
-          <li>
-            <b>No es un agrónomo.</b> La última palabra es suya.
-          </li>
-        </ul>
-      </div>
+      <section className="tarjeta seccion">
+        <Rotulo>Lo que Sereno no hace</Rotulo>
+        {NO_HACE.map(([t, q]) => (
+          <p key={t} style={{ fontSize: 13.5, lineHeight: 1.45, margin: "0 0 11px" }}>
+            <b>{t}</b>{" "}
+            <span style={{ color: "var(--tinta-2)" }}>{q}</span>
+          </p>
+        ))}
+      </section>
     </div>
   );
 }

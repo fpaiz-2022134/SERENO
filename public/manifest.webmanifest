@@ -1,18 +1,38 @@
 {
   "name": "Sereno · clima para el agricultor",
   "short_name": "Sereno",
-  "description": "Aviso de ventana de infección de roya del café, por parcela, con días de anticipación.",
+  "description": "Aviso de ventana de infección de roya del café, por parcela, con días de anticipación. El riesgo lo decide un motor determinista, no una IA.",
   "lang": "es-GT",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f4ebdc",
-  "theme_color": "#2f6585",
+  "background_color": "#f4f2ea",
+  "theme_color": "#171812",
   "icons": [
-    { "src": "/icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icono.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icono-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

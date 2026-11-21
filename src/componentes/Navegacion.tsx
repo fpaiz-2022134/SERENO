@@ -1,14 +1,15 @@
-/** Barra flotante de 5: Inicio · Mi parcela · + (roble) · Alertas · Perfil. */
+/**
+ * La barra: una regla negra pegada al borde, no una píldora flotante.
+ *
+ * El botón del medio («CALCULAR») es el único elemento de la barra con color,
+ * y lleva el color del riesgo vigente: desde cualquier pantalla se ve en qué
+ * banda está la parcela sin volver al inicio.
+ */
 "use client";
 
-export type Vista = "hoy" | "parcela" | "alertas" | "perfil" | "resultado";
+import { Campana, Casa, Parcela, Persona, Regla } from "@/componentes/Iconos";
 
-const ICONOS: Record<string, string> = {
-  hoy: "⌂",
-  parcela: "◎",
-  alertas: "◔",
-  perfil: "☗",
-};
+export type Vista = "hoy" | "parcela" | "alertas" | "perfil" | "resultado";
 
 export function Navegacion({
   vista,
@@ -19,34 +20,41 @@ export function Navegacion({
   ir: (v: Vista) => void;
   alCalcular: () => void;
 }) {
-  const boton = (v: Vista, nombre: string) => (
+  const ITEMS: { v: Vista; nombre: string; Icono: typeof Casa }[] = [
+    { v: "hoy", nombre: "Hoy", Icono: Casa },
+    { v: "parcela", nombre: "Parcela", Icono: Parcela },
+  ];
+  const FIN: { v: Vista; nombre: string; Icono: typeof Casa }[] = [
+    { v: "alertas", nombre: "Alertas", Icono: Campana },
+    { v: "perfil", nombre: "Perfil", Icono: Persona },
+  ];
+
+  const boton = ({ v, nombre, Icono }: { v: Vista; nombre: string; Icono: typeof Casa }) => (
     <button
+      key={v}
       type="button"
-      className="navegacion__boton"
+      className="barra__ir"
       aria-current={vista === v ? "page" : undefined}
       onClick={() => ir(v)}
     >
-      <span aria-hidden="true" style={{ fontSize: 16 }}>
-        {ICONOS[v]}
-      </span>
+      <Icono tam={19} />
       {nombre}
     </button>
   );
 
   return (
-    <nav className="navegacion" aria-label="Navegación principal">
-      {boton("hoy", "Inicio")}
-      {boton("parcela", "Mi parcela")}
+    <nav className="barra" aria-label="Navegación principal">
+      {ITEMS.map(boton)}
       <button
         type="button"
-        className="navegacion__mas"
+        className="barra__calcular"
         onClick={alCalcular}
         aria-label="Calcular riesgo y costos"
       >
-        <span aria-hidden="true">+</span>
+        <Regla tam={19} />
+        Calcular
       </button>
-      {boton("alertas", "Alertas")}
-      {boton("perfil", "Perfil")}
+      {FIN.map(boton)}
     </nav>
   );
 }

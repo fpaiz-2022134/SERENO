@@ -23,7 +23,11 @@ import { importarBoletines } from "@/lib/fuentes/anacafe";
 import { preciosMasRecientes } from "@/lib/fuentes/maga-precios";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// 60 s es el tope del plan Hobby de Vercel. Con 120 el despliegue lo rechaza.
+// Esta ruta consulta las seis fuentes, y GDELT sola puede tardar por su limite
+// de una peticion cada 5 s: si no cabe en 60 s, la respuesta dice que esa
+// fuente no contesto, que es justo lo que tiene que decir.
+export const maxDuration = 60;
 
 const FICHAS = [
   {

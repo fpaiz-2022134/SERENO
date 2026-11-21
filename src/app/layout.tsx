@@ -1,27 +1,29 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, IBM_Plex_Mono, Playfair_Display } from "next/font/google";
+import { Figtree, Fraunces } from "next/font/google";
 import "./globales.css";
 
-/** Las tres tipografías del branding, servidas desde el propio dominio. */
-const display = Playfair_Display({
+/**
+ * v2 «Luz de cafetal».
+ *
+ * Fraunces para los números y los títulos: es variable en los ejes SOFT y
+ * WONK, así que se le puede pedir que sea redonda y un poco irregular, como
+ * algo que creció y no como algo que se imprimió. Figtree para leer: geométrica
+ * pero cálida, muy legible en pantalla pequeña y al sol.
+ *
+ * Nada de monoespaciada: es lo que le daba cara de terminal a la versión
+ * anterior. Los números se alinean con `font-variant-numeric: tabular-nums`.
+ */
+const serif = Fraunces({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  axes: ["SOFT", "WONK", "opsz"],
   style: ["normal", "italic"],
-  variable: "--fuente-display",
+  variable: "--fuente-serif",
   display: "swap",
 });
 
-const texto = DM_Sans({
+const sans = Figtree({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--fuente-texto",
-  display: "swap",
-});
-
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--fuente-mono",
+  variable: "--fuente-sans",
   display: "swap",
 });
 
@@ -35,7 +37,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2f6585",
+  themeColor: "#f5f8f3",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -43,7 +45,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es-GT" className={`${display.variable} ${texto.variable} ${mono.variable}`}>
+    <html lang="es-GT" className={`${serif.variable} ${sans.variable}`}>
       <body>{children}</body>
     </html>
   );

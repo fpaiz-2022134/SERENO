@@ -14,11 +14,11 @@
  *    degrada al patrón de curvas de nivel con la coordenada escrita.
  */
 
-const VERSION = "sereno-v1";
+const VERSION = "sereno-v2";
 const ARMAZON = `${VERSION}-armazon`;
 const MAPAS = `${VERSION}-mapas`;
 
-const BASICOS = ["/", "/manifest.webmanifest", "/icono.svg"];
+const BASICOS = ["/", "/manifest.webmanifest", "/icono.svg", "/fotos/cafetal.jpg"];
 
 self.addEventListener("install", (evento) => {
   evento.waitUntil(
@@ -48,7 +48,11 @@ function esArmazon(url) {
     (url.pathname.startsWith("/_next/static/") ||
       url.pathname === "/" ||
       url.pathname === "/manifest.webmanifest" ||
-      url.pathname.startsWith("/icono"))
+      url.pathname.startsWith("/icono") ||
+      // Las fotos del cafetal y de la hoja con roya: son parte de la app, no
+      // un dato. Sin ellas la pantalla se entiende, pero con ellas se lee
+      // mejor, asi que se cachean con el armazon.
+      url.pathname.startsWith("/fotos/"))
   );
 }
 

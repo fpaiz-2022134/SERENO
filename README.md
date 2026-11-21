@@ -1,5 +1,7 @@
 # SERENO
 
+### ▶ La app, en vivo: **https://sereno-tan.vercel.app**
+
 **Alerta de ventana de infeccion de roya del cafe, por parcela, con dias de anticipacion.**
 
 Cuando el caficultor ve las manchas anaranjadas en el enves de la hoja, la
@@ -391,7 +393,7 @@ cachea **un** documento y la app abre completa en modo avión.
 ```
 src/app/globales.css     los tokens de docs/branding.md, en un solo archivo
 src/componentes/         App (armazon) · Logo+Medidor · Navegacion · Avisos · MapaParcela
-src/pantallas/           Acceso · ConfirmarCorreo · SinParcela · Hoy · MiParcela · Resultado · Alertas · Perfil
+src/pantallas/           Acceso · SinParcela · Hoy · MiParcela · Resultado · Alertas · Perfil
 src/lib/ui/              tipos · riesgo (banda → color+palabra) · fechas · almacen · red
 public/manifest.webmanifest  public/sw.js  public/icono*.png
 ```
@@ -450,34 +452,92 @@ de fresco.
 - **Notificaciones push.** No hay. La pantalla de Alertas lo dice: el canal es
   WhatsApp y el mensaje se manda desde «Resultado».
 
-### Autenticación — decisión tomada y declarada
+### Autenticación — real, contra Postgres
 
-**No hay servidor de identidad.** El esquema tiene `usuarios.sujeto_externo`
-preparado, pero implementar correo+contraseña de verdad (hash, sesión firmada,
-envío de correo) no cabía en la hackatón sin recortar las pantallas.
+**Hay cuentas de verdad.** Registro, acceso y sesión, contra la misma base de
+Neon, sin dependencias nuevas:
 
-Lo que hay: las pantallas de **Acceso** y **Confirmar correo** del branding,
-funcionando, con la sesión guardada en `localStorage` de ese teléfono. **Las dos
-pantallas lo dicen en letra visible**, no simulado:
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| `db/migraciones/0004_cuentas_y_sesiones.sql` | Neon | `usuarios.contrasena_hash`, tabla `sesiones`, índice único de `lower(correo)`, `parcelas.lugar` |
+| `src/lib/auth.ts` | servidor | scrypt de `node:crypto` (cero dependencias), sesiones, cookie, freno a la fuerza bruta |
+| `/api/cuenta`, `/api/cuenta/registro`, `/api/cuenta/acceso`, `/api/cuenta/salir` | servidor | el ciclo completo |
+| `src/lib/parcelas.ts` + `/api/parcelas` | servidor | las parcelas, **siempre** por `comoProductor()` |
 
-> «Esta pantalla no valida contra un servidor. En esta versión la sesión se
-> guarda solo en este teléfono: no hay cuentas en la nube ni se envía ningún
-> correo. Lo decimos en lugar de simularlo.»
->
-> «No se envió ningún correo. Para seguir, escriba **482100**.»
+**Dos cosas que no se guardan nunca.** La contraseña: se guarda
+`scrypt(contraseña, sal)` con sal aleatoria por usuario. Y el token de sesión:
+se guarda su SHA-256. Quien se lleve la tabla `sesiones` no entra con nada de
+lo que hay ahí, porque el token original solo vive en la cookie `HttpOnly` del
+teléfono — donde el JavaScript de la página tampoco lo alcanza.
 
-El código de demostración es `482100` y está impreso en la propia pantalla.
-Nada de esto toca la base de datos, así que **el RLS sigue intacto**: ninguna
-petición de usuario pasa por `conexionServicio()` porque el frontend no habla
-con la base. Cuando se conecte un proveedor de identidad, el punto de entrada
-es `comoProductor(usuarioId, fn)` en `src/lib/db.ts`.
+Detalles que importan y están en el código: el correo es único **sin distinguir
+mayúsculas**; «correo que no existe» y «contraseña mala» devuelven el mismo
+mensaje y tardan parecido, porque la diferencia regalaría una lista de qué
+correos tienen cuenta; y comparar hashes es `timingSafeEqual`, no `===`.
 
-### El mapa
+> **Lo que todavía no hay: verificación de correo.** No hay proveedor de correo
+> configurado, así que **no se manda ningún código** — y por eso tampoco hay una
+> pantalla que finja mandarlo. La cuenta queda usable de una vez. Con una llave
+> de un proveedor (Resend, SMTP) el paso se agrega de verdad.
 
-Teselas de OpenStreetMap puestas a mano (`src/componentes/MapaParcela.tsx`): sin
-librería de mapa, sin llave, sin JavaScript de terceros. El service worker las
-cachea cuando pasan; sin conexión el mapa se degrada al patrón de curvas de
-nivel **con la coordenada escrita**, que dice más que un recuadro en blanco.
+`usuarios.sujeto_externo` queda libre: el día que se conecte Neon Auth o Clerk,
+se llena esa columna y conviven las dos formas de entrar.
+
+### El RLS, por fin usado de verdad
+
+Las parcelas ya no viven en el teléfono: están en Postgres y **toda** consulta
+de usuario pasa por `comoProductor()`, o sea por el rol `sereno_app`, al que el
+RLS **sí** se le aplica. Varias consultas de `src/lib/parcelas.ts` ni siquiera
+llevan `where productor_id`: no es un descuido, es que la policy ya lo puso.
+
+Comprobado con dos cuentas reales contra Neon:
+
+```
+Ana crea su parcela                              → 201
+Beto se registra y lista sus parcelas            → 0
+Beto intenta EDITAR la parcela de Ana            → 404
+Beto intenta BORRAR la parcela de Ana            → 404
+Ana la sigue viendo intacta                      → 1
+Sin sesión                                       → 401
+```
+
+Es **404 y no 403** a propósito: un 403 confirmaría que esa parcela existe y es
+de alguien.
+
+### Sin conexión, ahora que la cuenta está en el servidor
+
+Esto se rompía solo: si la cuenta vive en el servidor, **sin señal la app no
+puede preguntar quién entró**, y el productor vería la pantalla de acceso en vez
+de su reporte. Por eso se guarda en el teléfono una **instantánea** de lo último
+que dijo el servidor —correo, nombre y parcelas, nunca el token— y se usa
+**solo** cuando la petición falla por red. Si el servidor responde que no hay
+sesión, manda el servidor. En modo copia la pantalla lo dice y los campos de la
+parcela quedan de solo lectura, en vez de fingir que guardan.
+
+### El mapa: se arrastra con el dedo
+
+Escribir una latitud y una longitud a mano es inusable en el campo. Hay tres
+caminos al mismo punto, de más fácil a más preciso:
+
+1. **Buscar el municipio o la aldea.** `/api/lugares` consulta el
+   geocodificador de **Open-Meteo** — la misma casa que da el pronóstico, así
+   que no se agrega fuente ni llave nueva. La llamada sale del servidor.
+2. **«Estoy parado en mi parcela»**, que usa el GPS del teléfono.
+3. **Arrastrar el mapa**, con la mira fija en el centro: lo que queda debajo de
+   la mira es la parcela. Es mejor que «tocar el punto» porque el dedo no tapa
+   justo lo que se quiere apuntar.
+
+La coordenada escrita a mano sigue ahí, plegada, para quien de verdad la tenga.
+
+El mapa son teselas de OpenStreetMap colocadas a mano y un puñado de cuentas de
+Mercator (`src/componentes/MapaParcela.tsx`): **sin librería de mapa, sin llave
+y sin JavaScript de terceros.** Leaflet pesa 40 KB para un productor con señal
+intermitente. El service worker cachea las teselas; sin conexión queda el fondo
+con la coordenada escrita.
+
+> **Ojo con la altitud:** el geocodificador devuelve la del pueblo, no la de la
+> celda del pronóstico. Se descarta. La que manda para el motor es la que
+> devuelve `/api/prevencion`, y es la que se guarda en la parcela.
 
 ### Comprobado corriendo, no asumido
 
@@ -540,6 +600,51 @@ curl "http://localhost:3000/api/fuentes?probar=1&lat=14.50&lon=-91.15"
 ```
 
 ---
+
+## Desplegar en Vercel
+
+El proyecto es Next.js sin nada raro: Vercel lo detecta solo. Hay `vercel.json`
+con la región `iad1` (la misma de la base en Neon, para que la latencia no se
+sume) y las cabeceras del service worker.
+
+### Variables de entorno que hay que poner en Vercel
+
+**Ninguna de las seis fuentes de datos necesita llave**, así que el clima, la
+prevención, el mercado y el histórico funcionan **sin configurar nada**. Las
+variables son solo para la base:
+
+| Variable | Para qué | ¿Obligatoria? |
+|---|---|---|
+| `DATABASE_URL_POOLED` | conexión **del pooler** de Neon (la del host con `-pooler`), rol dueño. En serverless cada invocación abre conexiones nuevas: sin pooler se agota el límite | solo para guardar |
+| `DATABASE_URL` | conexión **directa**, rol dueño. Para migraciones | no en runtime |
+| `DATABASE_URL_APP` | rol `sereno_app`, el único al que se le aplica el RLS | solo para atender a un productor |
+
+Los valores están en el `.env.local` de quien montó la base, o se sacan de la
+consola de Neon (proyecto `sereno`). **No están en el repo y no deben estarlo.**
+
+> Si no se configura ninguna, la app arranca igual: lo único que deja de
+> funcionar es `/api/historico?guardar=1`, que responderá diciendo qué falta en
+> vez de romperse.
+
+### Conectar el repositorio
+
+1. En [vercel.com/new](https://vercel.com/new), **Import Git Repository** y
+   autorizar GitHub para `fpaiz-2022134/SERENO`.
+2. Framework: **Next.js** (lo detecta solo). No cambiar el directorio raíz ni
+   los comandos de build.
+3. Pegar las variables de arriba en **Environment Variables**.
+4. **Production Branch:** `main` si ya se integró el PR; mientras tanto,
+   `backend/motor-y-fuentes`, que es la rama que tiene la UI y el backend juntos.
+
+### Lo que hay que mirar después del primer despliegue
+
+- `/api/fuentes?probar=1&lat=14.50&lon=-91.15` — dice, fuente por fuente, cuál
+  respondió desde el servidor de Vercel. Es la forma rápida de ver si alguna
+  falla por la IP del despliegue y no por el código.
+- **GDELT puede dar 429** desde Vercel igual que en local. Está contemplado: la
+  respuesta lo dice en vez de romperse.
+- **Open-Meteo sin llave tiene límite de uso.** Para el pitch conviene no
+  recargar en vivo muchas veces seguidas.
 
 ## Estructura
 
