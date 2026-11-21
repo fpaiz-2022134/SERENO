@@ -7,7 +7,7 @@
  * diaria + los eventos de infeccion detectados. Con `comparar=1` agrega la
  * segunda opinion de met.no (que NO alimenta el motor).
  */
-import { ADVERTENCIA_MOTOR, errorJson, json, leerCoordenadas, leerEntero } from "@/lib/api";
+import { ADVERTENCIA_MOTOR, condicionesActuales, errorJson, json, leerCoordenadas, leerEntero } from "@/lib/api";
 import { pronosticoHorario } from "@/lib/fuentes/open-meteo";
 import { pronosticoMetNorway } from "@/lib/fuentes/met-norway";
 import { detectarEventos, riesgoPorDia } from "@/lib/motor/riesgo";
@@ -71,6 +71,7 @@ export async function GET(peticion: Request) {
       fuentes: ROYA_CAFE.fuentes,
     },
     horas: serie.tiempo.length,
+    ahora: condicionesActuales(serie),
     curva,
     eventos,
     eventosConfirmados: eventos.filter((e) => e.esEvento).length,

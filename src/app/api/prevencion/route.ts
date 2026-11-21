@@ -11,7 +11,7 @@
  *  5. dias desde la ultima aplicacion y si el ultimo evento quedo cubierto
  * Mas el aviso redactado y los boletines de Anacafé del tema.
  */
-import { ADVERTENCIA_MOTOR, errorJson, json, leerCoordenadas } from "@/lib/api";
+import { ADVERTENCIA_MOTOR, condicionesActuales, errorJson, json, leerCoordenadas } from "@/lib/api";
 import { pronosticoHorario } from "@/lib/fuentes/open-meteo";
 import {
   coberturaDeAplicacion,
@@ -55,6 +55,8 @@ export async function GET(peticion: Request) {
     ok: true,
     punto: { latitud: serie.latitud, longitud: serie.longitud, altitudMetros: serie.altitudMetros },
     hoy,
+    // Insumos del motor, NO decisiones: la UI los rotula como estimacion.
+    ahora: condicionesActuales(serie),
     // Dato 1
     ventanaDeAccion: ventana,
     // Dato 2
