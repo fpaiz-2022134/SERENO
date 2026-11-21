@@ -1,4 +1,4 @@
-# SERENO · backend
+# SERENO
 
 **Alerta de ventana de infeccion de roya del cafe, por parcela, con dias de anticipacion.**
 
@@ -378,6 +378,130 @@ determinista. Llamarlo dos veces deja 60 filas, no 120.
 **Nada de llaves en el repo.** `.env.local` está en `.gitignore`; la plantilla es
 [`.env.example`](.env.example). `npm run crear-rol-app` genera la contraseña de
 `sereno_app`, la escribe solo en `.env.local` y **no la imprime**.
+
+---
+
+## El frontend · la PWA
+
+La app que ve el productor vive en `/` y es una **PWA instalable que abre sin
+conexión**. Es una sola página de Next (`src/app/page.tsx` → `src/componentes/App.tsx`)
+con las pantallas en estado del cliente, a propósito: así el service worker
+cachea **un** documento y la app abre completa en modo avión.
+
+```
+src/app/globales.css     los tokens de docs/branding.md, en un solo archivo
+src/componentes/         App (armazon) · Logo+Medidor · Navegacion · Avisos · MapaParcela
+src/pantallas/           Acceso · ConfirmarCorreo · SinParcela · Hoy · MiParcela · Resultado · Alertas · Perfil
+src/lib/ui/              tipos · riesgo (banda → color+palabra) · fechas · almacen · red
+public/manifest.webmanifest  public/sw.js  public/icono*.png
+```
+
+Las seis pantallas son las de las láminas 7, 8 y 9 del branding, con la paleta,
+las tipografías (Playfair Display · DM Sans · IBM Plex Mono), los radios y la
+navegación flotante de cinco de la lámina 10.
+
+### Todo lo que muestra sale de `/api/prevencion`
+
+Una sola llamada por parcela. Nada de datos simulados: la curva, la ventana, las
+horas de mojado, la altitud (912 m en la coordenada de demo) y el texto de
+WhatsApp vienen del endpoint. El botón de WhatsApp comparte `aviso.texto` tal
+como lo redactó `src/lib/aviso.ts`, con el total de costos que el productor
+escribió y la procedencia al pie.
+
+Para la tarjeta de temperatura/humedad/lluvia el frontend necesitaba la hora
+actual, que el motor no exponía. Se agregó `condicionesActuales()` en
+`src/lib/api.ts` y el campo **`ahora`** a `/api/clima` y `/api/prevencion`: sale
+de la misma serie horaria de Open-Meteo, viaja con `esEstimacion: true` y la UI
+lo rotula «estimación meteorológica, no una medición en su finca». El motor no
+se tocó.
+
+> **Tensión declarada.** `SERENO-investigacion.md` §0A sostiene que temperatura,
+> humedad y lluvia crudas **no** deberían ir en el panel porque «son insumos, no
+> decisiones». El branding sí las pide como datos 2, 3 y 4. Se siguió el
+> branding, que es la decisión más nueva del equipo, pero esos tres datos van
+> **debajo** del dato 1 (el riesgo con su ventana) y rotulados como estimación.
+
+### Los estados honestos, implementados de verdad
+
+| Regla del branding | Dónde está |
+|---|---|
+| «No disponible» **y qué falta**, nunca un cero | `DatoVacio` en `src/componentes/Avisos.tsx`; pantalla `SinParcela` completa |
+| Sin conexión: el último reporte **con su fecha** | `pedirConRespaldo()` en `src/lib/ui/red.ts` devuelve `origen: "cache"` y `recibidoEn`; `AvisoSinConexion` pinta «Viendo el reporte del sáb 21 nov, 12:57» |
+| «Estimación meteorológica. No es una medición en su finca.» | `AvisoEstimacion`, en Hoy |
+| «Open-Meteo para su municipio · no medido en la finca» | `Procedencia_`, con la hora real de consulta y la altitud de la celda |
+| Riesgo = **color + palabra**, siempre | `src/lib/ui/riesgo.ts`: `poco_favorable`→Calma/olivo, `favorable`→Atención/miel, `muy_favorable`→Alerta/cedro. Uno a uno con `bandaDeIndice()` |
+| Costos: «no es una recomendación automática» | pantalla `Resultado`; los montos van **vacíos** porque no sabemos cuánto vale el jornal en su municipio |
+
+**El service worker no cachea `/api/*` a propósito.** El último reporte lo
+guarda la app en `localStorage` con su fecha, y la pantalla la enseña. Un dato
+viejo servido en silencio por el service worker sería un dato viejo disfrazado
+de fresco.
+
+### Lo que el branding promete y la UI no finge tener
+
+- **Cinco cultivos.** Solo café tiene umbrales verificados. Los chips de maíz,
+  frijol, cardamomo y hortalizas están **deshabilitados y dicen «próximamente»**
+  (`CULTIVOS` en `src/lib/ui/almacen.ts`), y si una parcela quedara con otro
+  cultivo, la tarjeta de riesgo dice «No disponible» con el motivo.
+- **INSIVUMEH.** No está integrado y **no aparece** en ninguna pantalla. El
+  Perfil lo dice explícitamente.
+- **Mapa de brotes por noticias.** Fuera del MVP: GDELT devuelve cero artículos
+  de roya. No hay sección de noticias.
+- **Notificaciones push.** No hay. La pantalla de Alertas lo dice: el canal es
+  WhatsApp y el mensaje se manda desde «Resultado».
+
+### Autenticación — decisión tomada y declarada
+
+**No hay servidor de identidad.** El esquema tiene `usuarios.sujeto_externo`
+preparado, pero implementar correo+contraseña de verdad (hash, sesión firmada,
+envío de correo) no cabía en la hackatón sin recortar las pantallas.
+
+Lo que hay: las pantallas de **Acceso** y **Confirmar correo** del branding,
+funcionando, con la sesión guardada en `localStorage` de ese teléfono. **Las dos
+pantallas lo dicen en letra visible**, no simulado:
+
+> «Esta pantalla no valida contra un servidor. En esta versión la sesión se
+> guarda solo en este teléfono: no hay cuentas en la nube ni se envía ningún
+> correo. Lo decimos en lugar de simularlo.»
+>
+> «No se envió ningún correo. Para seguir, escriba **482100**.»
+
+El código de demostración es `482100` y está impreso en la propia pantalla.
+Nada de esto toca la base de datos, así que **el RLS sigue intacto**: ninguna
+petición de usuario pasa por `conexionServicio()` porque el frontend no habla
+con la base. Cuando se conecte un proveedor de identidad, el punto de entrada
+es `comoProductor(usuarioId, fn)` en `src/lib/db.ts`.
+
+### El mapa
+
+Teselas de OpenStreetMap puestas a mano (`src/componentes/MapaParcela.tsx`): sin
+librería de mapa, sin llave, sin JavaScript de terceros. El service worker las
+cachea cuando pasan; sin conexión el mapa se degrada al patrón de curvas de
+nivel **con la coordenada escrita**, que dice más que un recuadro en blanco.
+
+### Comprobado corriendo, no asumido
+
+- `npm run build` y `npm test` (41 pruebas) pasan.
+- Recorrido completo en viewport de 375×812: Acceso → código → Sin parcela →
+  Mi parcela → Hoy → Resultado → Alertas → Perfil, contra los endpoints reales.
+- **Sin conexión de verdad:** con el servidor apagado (`pkill next-server`), la
+  app recargó completa desde el service worker y mostró «No se pudo actualizar.
+  Viendo el reporte del sáb 21 nov, 12:57» con todos los datos del último
+  reporte.
+- Service worker activo y controlando la página, 15 entradas en caché, manifest
+  servido desde la caché estando el servidor caído.
+
+### Lo que queda pendiente
+
+- **La ventana de acción abarca los 16 días** en la coordenada de demo, así que
+  «aplique antes del viernes 20» cae **en el pasado**. Es la observación que ya
+  traía este README. La UI **no maquilla la fecha**: cuando el límite ya pasó,
+  el Resultado dice «La ventana ya empezó» y explica qué queda por hacer. Subir
+  la banda del aviso a `muy_favorable` sigue siendo decisión de producto, no de
+  código.
+- Las parcelas viven en el teléfono, no en Postgres. El esquema y el RLS están
+  listos; falta la identidad para poder escribir como productor.
+
 
 ## Cómo correrlo
 
