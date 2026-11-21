@@ -1,8 +1,8 @@
 /**
  * Alertas — la curva entera, día por día, y lo que ya quedó guardado.
  *
- * No hay notificaciones push en esta versión y la pantalla lo dice: el canal
- * real del producto es WhatsApp, y ese mensaje sale desde «Resultado».
+ * El canal del aviso es WhatsApp: el mensaje sale desde «Resultado», ya
+ * redactado por el motor.
  */
 "use client";
 
@@ -99,13 +99,16 @@ export function Alertas({ resultado }: { resultado: Resultado<RespuestaPrevencio
         )}
       </section>
 
+      {/* No es una disculpa por lo que falta: es dónde está el aviso. En una
+          pantalla que se llama "Alertas", decir por dónde sale el mensaje es
+          lo útil. */}
       <div className="nota" style={{ marginTop: 18 }}>
         <span className="nota__signo" aria-hidden="true">
           ◈
         </span>
         <span>
-          <b>Esta versión no manda notificaciones.</b> El canal del aviso es WhatsApp y el
-          mensaje se envía desde «Resultado», con el texto que ya redactó el motor.
+          El aviso se manda <b>por WhatsApp</b> desde «Resultado», con el texto que ya
+          redactó el motor.
         </span>
       </div>
     </div>

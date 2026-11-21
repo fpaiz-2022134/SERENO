@@ -77,3 +77,23 @@ export function fechaDeHoy(dia: string): string {
   const t = fechaCompleta(dia);
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
+
+/**
+ * El dia de hoy en Guatemala, en formato YYYY-MM-DD.
+ *
+ * Hace falta el dia REAL, no el `hoy` que trae el reporte: un reporte
+ * guardado en el telefono hace tres dias sigue diciendo que su `hoy` es el de
+ * hace tres dias. Comparar la ventana contra esa fecha vieja es justo lo que
+ * hace que se enseñen plazos vencidos como si fueran de ahora.
+ *
+ * Se fuerza la zona de Guatemala y no la del aparato: el productor puede
+ * tener el telefono mal configurado, y la parcela sigue estando donde esta.
+ */
+export function hoyEnGuatemala(): string {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Guatemala",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}

@@ -42,7 +42,7 @@ export async function GET(peticion: Request) {
   const curva = riesgoPorDia(serie, ROYA_CAFE);
   const hoy = serie.tiempo[0]?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
   const ventana = ventanaDeAccion(curva, ROYA_CAFE, hoy);
-  const aviso = redactarAviso({ nombreParcela, ventana, dias: curva, eventos });
+  const aviso = redactarAviso({ nombreParcela, ventana, dias: curva, eventos, hoy });
   const cobertura = coberturaDeAplicacion(hoy, ultimaAplicacion, eventos);
 
   // Boletines de Anacafé sobre roya. Si el indice no responde, van los de referencia.

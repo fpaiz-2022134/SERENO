@@ -13,8 +13,9 @@
 import { useMemo, useState } from "react";
 import { AvisoSinConexion, Imprenta, Rotulo } from "@/componentes/Avisos";
 import { Compartir, Guardar } from "@/componentes/Iconos";
-import { diasEntre, pinta } from "@/lib/ui/paleta";
-import { fechaCompleta, fechaCorta, fechaLarga } from "@/lib/ui/fechas";
+import { faseDeVentana } from "@/lib/aviso";
+import { pinta } from "@/lib/ui/paleta";
+import { fechaCompleta, fechaCorta, fechaLarga, hoyEnGuatemala } from "@/lib/ui/fechas";
 import { agregarSeguimiento, guardarCostos, type Costos } from "@/lib/ui/almacen";
 import { nombreDeVariedad, type Parcela } from "@/lib/ui/cuenta";
 import type { RespuestaPrevencion } from "@/lib/ui/tipos";
@@ -88,7 +89,13 @@ export function Resultado({
     setGuardado(true);
   }
 
-  const plazo = ventana ? diasEntre(d.hoy, ventana.aplicarAntesDe) : null;
+  /**
+   * En que momento de la ventana estamos, contra el dia REAL y no contra el
+   * `d.hoy` del reporte, que si viene de la cache puede tener dias. Es la
+   * misma funcion que redacta el texto de WhatsApp: pantalla y mensaje no
+   * pueden decir cosas distintas.
+   */
+  const fase = ventana ? faseDeVentana(ventana, hoyEnGuatemala()) : null;
 
   return (
     <div className="pliego">
@@ -141,19 +148,45 @@ export function Resultado({
                 <b>{fechaCorta(ventana.fin)}</b>.
               </>
             )}{" "}
-            Aplique antes del <b>{fechaCompleta(ventana.aplicarAntesDe)}</b>.
+            {/* Nunca una fecha que ya pasó: lo que se dice depende de la fase. */}
+            {fase?.fase === "por_venir" && (
+              <>
+                Aplique antes del <b>{fechaCompleta(ventana.aplicarAntesDe)}</b>.
+              </>
+            )}
           </p>
-          {/* El motor puede poner la fecha límite en el pasado si la ventana
-              ya empezó. No se maquilla la fecha: se explica. */}
-          {plazo != null && plazo <= 0 && (
+
+          {fase?.fase === "abierta" && (
+            <div className="nota" style={{ marginTop: 12 }}>
+              <span className="nota__signo" aria-hidden="true">
+                ◈
+              </span>
+              <span>
+                {fase.diasQueQuedan === 1 ? (
+                  <>
+                    <b>Hoy es el último día de la ventana.</b> Si va a actuar, hable hoy
+                    con su técnico.
+                  </>
+                ) : (
+                  <>
+                    <b>La ventana ya está abierta</b> y va hasta el{" "}
+                    {fechaCompleta(ventana.fin)}: quedan {fase.diasQueQuedan} días. Ya no
+                    hay días de anticipación que ganar; si va a actuar, hable hoy con su
+                    técnico.
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+
+          {fase?.fase === "vencida" && (
             <div className="nota nota--alta" style={{ marginTop: 12 }}>
               <span className="nota__signo" aria-hidden="true">
                 !
               </span>
               <span>
-                <b>La ventana ya empezó.</b> La fecha límite que calcula el motor cayó antes
-                de hoy, así que no hay días de anticipación que ganar: lo que queda es
-                revisar el cultivo y hablar con su técnico hoy mismo.
+                <b>Este reporte venció.</b> La ventana que describe terminó el{" "}
+                {fechaCompleta(ventana.fin)}. Conéctese para bajar el pronóstico de hoy.
               </span>
             </div>
           )}

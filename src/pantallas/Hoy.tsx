@@ -22,8 +22,9 @@ import { Medidor } from "@/componentes/Medidor";
 import { Cabecera, FOTOS, Referencia } from "@/componentes/Fotos";
 import { AvisoEstimacion, AvisoSinConexion, Imprenta, Rotulo, Vacio } from "@/componentes/Avisos";
 import { Flecha, Gota, Hoja, Regla } from "@/componentes/Iconos";
+import { faseDeVentana } from "@/lib/aviso";
 import { diasEntre, pinta } from "@/lib/ui/paleta";
-import { fechaCorta, fechaDeHoy } from "@/lib/ui/fechas";
+import { fechaCorta, fechaDeHoy, hoyEnGuatemala } from "@/lib/ui/fechas";
 import type { Parcela } from "@/lib/ui/cuenta";
 import type { RespuestaPrevencion } from "@/lib/ui/tipos";
 import type { Resultado } from "@/lib/ui/red";
@@ -69,8 +70,13 @@ export function Hoy({
   const p = pinta(ventana?.nivel ?? curva[0]?.nivel);
   const pDia = pinta(dia?.nivel);
 
-  /** Días que faltan para la fecha límite. ≤ 0 = la ventana ya empezó. */
-  const plazo = ventana ? diasEntre(d.hoy, ventana.aplicarAntesDe) : null;
+  /**
+   * En qué momento de la ventana estamos, contra el día REAL — no contra el
+   * `d.hoy` del reporte, que si viene de la caché puede tener varios días.
+   * La decide `faseDeVentana()`, la misma que redacta el texto de WhatsApp,
+   * para que la pantalla y el mensaje nunca digan cosas distintas.
+   */
+  const fase = ventana ? faseDeVentana(ventana, hoyEnGuatemala()) : null;
 
   return (
     <>
@@ -126,32 +132,70 @@ export function Hoy({
                 )}
               </p>
 
-              {plazo != null && (
+              {/* Nunca una fecha que ya pasó: según la fase, el dial dice
+                  hasta cuándo hay que aplicar, o hasta cuándo dura la ventana
+                  abierta, o que el reporte venció. */}
+              {fase && ventana && (
                 <div className="veredicto__pie">
-                  <div className="dial">
-                    <div className="dial__que">Aplicar antes del</div>
-                    <div
-                      className="dial__val"
-                      style={{ fontFamily: "var(--sans)", fontSize: 17, letterSpacing: 0 }}
-                    >
-                      {fechaCorta(ventana!.aplicarAntesDe)}
+                  {fase.fase === "por_venir" ? (
+                    <>
+                      <div className="dial">
+                        <div className="dial__que">Aplicar antes del</div>
+                        <div
+                          className="dial__val"
+                          style={{ fontFamily: "var(--sans)", fontSize: 17, letterSpacing: 0 }}
+                        >
+                          {fechaCorta(ventana.aplicarAntesDe)}
+                        </div>
+                      </div>
+                      <div className="dial">
+                        <div className="dial__que">Le quedan</div>
+                        <div className="dial__val" style={{ color: p.color }}>
+                          {fase.diasHastaLimite}
+                          <small> {fase.diasHastaLimite === 1 ? "día" : "días"}</small>
+                        </div>
+                      </div>
+                    </>
+                  ) : fase.fase === "abierta" ? (
+                    <>
+                      <div className="dial">
+                        <div className="dial__que">
+                          {fase.diasQueQuedan === 1 ? "La ventana" : "Ventana abierta hasta"}
+                        </div>
+                        <div
+                          className="dial__val"
+                          style={{ fontFamily: "var(--sans)", fontSize: 17, letterSpacing: 0 }}
+                        >
+                          {fase.diasQueQuedan === 1 ? "termina hoy" : fechaCorta(ventana.fin)}
+                        </div>
+                      </div>
+                      <div className="dial">
+                        <div className="dial__que">Si va a aplicar</div>
+                        <div
+                          className="dial__val"
+                          style={{
+                            color: p.color,
+                            fontFamily: "var(--sans)",
+                            fontSize: 17,
+                            letterSpacing: 0,
+                          }}
+                        >
+                          hágalo hoy
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="dial">
+                      <div className="dial__que">Este reporte venció</div>
+                      <div
+                        className="dial__val"
+                        style={{ fontFamily: "var(--sans)", fontSize: 16, letterSpacing: 0 }}
+                      >
+                        La ventana terminó el {fechaCorta(ventana.fin)}. Conéctese para
+                        actualizar.
+                      </div>
                     </div>
-                  </div>
-                  <div className="dial">
-                    <div className="dial__que">{plazo > 0 ? "Le quedan" : "Estado"}</div>
-                    <div className="dial__val" style={{ color: p.color }}>
-                      {plazo > 0 ? (
-                        <>
-                          {plazo}
-                          <small> {plazo === 1 ? "día" : "días"}</small>
-                        </>
-                      ) : (
-                        <span style={{ fontFamily: "var(--sans)", fontSize: 17, letterSpacing: 0 }}>
-                          ya empezó
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </section>
