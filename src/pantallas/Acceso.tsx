@@ -1,15 +1,19 @@
 /**
- * Pantalla 1 · Acceso — solo correo y contraseña. «La parcela se agrega después.»
+ * Portada · Acceso — solo correo y contraseña.
  *
- * HONESTIDAD: no hay servidor de identidad detrás. La sesión se guarda solo en
- * este teléfono y la pantalla lo dice en letra visible, porque simularla como
- * si validara contra un servidor sería exactamente la clase de mentira que el
- * equipo acordó no hacer. Ver README § Autenticación.
+ * El nombre ocupa media pantalla porque es lo único que hay que entender
+ * aquí. El fondo es la luz entre las hojas, dibujada con gradientes: pesa
+ * cero y respira despacio.
+ *
+ * HONESTIDAD: no hay servidor de identidad. La sesión se guarda solo en este
+ * teléfono y la pantalla lo dice en letra visible, porque simular que valida
+ * sería exactamente la clase de mentira que el equipo acordó no hacer.
  */
 "use client";
 
 import { useState } from "react";
-import { Gota } from "@/componentes/Logo";
+import { Gota } from "@/componentes/Iconos";
+import { FOTOS } from "@/componentes/Fotos";
 
 export function Acceso({ alEntrar }: { alEntrar: (correo: string) => void }) {
   const [correo, setCorreo] = useState("");
@@ -33,19 +37,24 @@ export function Acceso({ alEntrar }: { alEntrar: (correo: string) => void }) {
   }
 
   return (
-    <div className="acceso">
-      <div className="acceso__tapa">
-        <div>
-          <Gota tam={64} color="rgba(255,255,255,0.92)" />
-          <div className="acceso__marca">Sereno</div>
-          <div className="acceso__lema">Clima para el agricultor</div>
-          <div className="acceso__promesa">Sepa antes. Decida usted.</div>
-        </div>
+    <div className="portada">
+      <div className="portada__fondo" aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={FOTOS.cafetal.src} alt="" />
       </div>
 
-      <form className="acceso__hoja" onSubmit={enviar} noValidate>
-        <label className="campo">
-          <span className="campo__rotulo">Correo electrónico</span>
+      <div className="portada__alto">
+        <div className="portada__gota entra entra-1">
+          <Gota tam={54} trazo={1.5} />
+        </div>
+        <h1 className="portada__titulo entra entra-1">Sereno</h1>
+        <div className="portada__lema entra entra-2">Clima para el agricultor</div>
+        <p className="portada__promesa entra entra-3">Sepa antes. Decida usted.</p>
+      </div>
+
+      <form onSubmit={enviar} noValidate>
+        <label className="campo entra entra-3">
+          <span className="campo__que">Correo electrónico</span>
           <input
             type="email"
             inputMode="email"
@@ -56,8 +65,8 @@ export function Acceso({ alEntrar }: { alEntrar: (correo: string) => void }) {
           />
         </label>
 
-        <label className="campo">
-          <span className="campo__rotulo">Contraseña</span>
+        <label className="campo entra entra-4">
+          <span className="campo__que">Contraseña</span>
           <input
             type="password"
             autoComplete="current-password"
@@ -68,24 +77,28 @@ export function Acceso({ alEntrar }: { alEntrar: (correo: string) => void }) {
         </label>
 
         {error && (
-          <div className="aviso aviso--cedro" role="alert">
-            <span aria-hidden="true">!</span>
+          <div className="nota nota--alta" role="alert" style={{ marginBottom: 12 }}>
+            <span className="nota__signo" aria-hidden="true">
+              !
+            </span>
             <span>{error}</span>
           </div>
         )}
 
-        <button type="submit" className="boton boton--principal" style={{ marginTop: 12 }}>
+        <button type="submit" className="boton entra entra-5" style={{ marginTop: 4 }}>
           Entrar
         </button>
 
-        <p className="acceso__pie">Solo correo y contraseña. Su parcela se agrega después.</p>
+        <p className="portada__pie">La parcela se agrega después</p>
 
-        <div className="aviso aviso--roble" style={{ marginTop: 14 }}>
-          <span aria-hidden="true">◈</span>
+        <div className="nota" style={{ marginTop: 16 }}>
+          <span className="nota__signo" aria-hidden="true">
+            ◈
+          </span>
           <span>
             <b>Esta pantalla no valida contra un servidor.</b> En esta versión la sesión se
             guarda solo en este teléfono: no hay cuentas en la nube ni se envía ningún
-            correo. Lo decimos en lugar de simularlo.
+            correo. Lo decimos en vez de simularlo.
           </span>
         </div>
       </form>

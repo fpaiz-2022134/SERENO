@@ -1,14 +1,18 @@
 /**
- * El armazón de la PWA.
+ * El armazón de la PWA, v2.
  *
- * Es una sola página con las pantallas en estado del cliente, y no rutas de
- * servidor, a propósito: así el service worker cachea UN documento y la app
- * abre completa sin conexión, sin pedir la carga parcial de ninguna ruta.
+ * Una sola página con las pantallas en estado del cliente, a propósito: así el
+ * service worker cachea UN documento y la app abre completa sin conexión, sin
+ * pedirle al servidor la carga parcial de ninguna ruta.
+ *
+ * Aquí también se fija `data-riesgo` en el <html>. De esa forma el color del
+ * riesgo baja por variables CSS a toda la app —incluido el botón de la barra—
+ * y no hay que pasarlo por props a cada componente.
  */
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Gota } from "@/componentes/Logo";
+import { Gota } from "@/componentes/Iconos";
 import { Navegacion, type Vista } from "@/componentes/Navegacion";
 import { Acceso } from "@/pantallas/Acceso";
 import { ConfirmarCorreo } from "@/pantallas/ConfirmarCorreo";
@@ -18,7 +22,9 @@ import { MiParcela } from "@/pantallas/MiParcela";
 import { Resultado } from "@/pantallas/Resultado";
 import { Alertas } from "@/pantallas/Alertas";
 import { Perfil } from "@/pantallas/Perfil";
+import { Vacio } from "@/componentes/Avisos";
 import { marcaDeTiempo } from "@/lib/ui/fechas";
+import { pinta } from "@/lib/ui/paleta";
 import {
   borrarParcela,
   borrarSesion,
@@ -34,7 +40,13 @@ import {
   type Parcela,
   type Sesion,
 } from "@/lib/ui/almacen";
-import { SinDatos, clavePrevencion, pedirConRespaldo, rutaPrevencion, type Resultado as Res } from "@/lib/ui/red";
+import {
+  SinDatos,
+  clavePrevencion,
+  pedirConRespaldo,
+  rutaPrevencion,
+  type Resultado as Res,
+} from "@/lib/ui/red";
 import type { RespuestaPrevencion } from "@/lib/ui/tipos";
 
 type Paso = "cargando" | "acceso" | "codigo" | "app";
@@ -50,7 +62,7 @@ export function App() {
   const [cargando, setCargando] = useState(false);
   const [errorReporte, setErrorReporte] = useState<string | null>(null);
 
-  const [acciones, setAcciones] = useState<string[]>([]);
+  const [labores, setLabores] = useState<string[]>([]);
   const [costos, setCostos] = useState<Costos | null>(null);
   const [enLinea, setEnLinea] = useState(true);
 
@@ -59,7 +71,7 @@ export function App() {
     const s = leerSesion();
     setSesion(s);
     setParcela(leerParcela());
-    setAcciones(leerAccionesHechas());
+    setLabores(leerAccionesHechas());
     setCostos(leerCostos());
     setPaso(s?.correoConfirmado ? "app" : "acceso");
     setEnLinea(navigator.onLine);
@@ -74,7 +86,7 @@ export function App() {
     };
   }, []);
 
-  /* --- registrar el service worker ---------------------------------- */
+  /* --- service worker ----------------------------------------------- */
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {
@@ -83,7 +95,16 @@ export function App() {
     }
   }, []);
 
-  /* --- consultar el pronóstico de la parcela ------------------------ */
+  /* --- el color del riesgo, una vez, en el documento ----------------- */
+  const nivel = reporte?.datos.ventanaDeAccion?.nivel ?? reporte?.datos.curva?.[0]?.nivel ?? null;
+
+  useEffect(() => {
+    const raiz = document.documentElement;
+    if (nivel && parcela?.cultivo === "cafe") raiz.setAttribute("data-riesgo", nivel);
+    else raiz.removeAttribute("data-riesgo");
+  }, [nivel, parcela?.cultivo]);
+
+  /* --- consultar el pronóstico --------------------------------------- */
   const consultar = useCallback(async (p: Parcela) => {
     setCargando(true);
     setErrorReporte(null);
@@ -110,13 +131,13 @@ export function App() {
 
   useEffect(() => {
     if (paso === "app" && parcela) void consultar(parcela);
-    // Solo por coordenada: cambiar el nombre no vuelve a pedir.
+    // Solo por coordenada y fecha de aplicación: renombrar no vuelve a pedir.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paso, parcela?.latitud, parcela?.longitud, parcela?.ultimaAplicacion]);
 
   const nombre = useMemo(() => sesion?.nombre ?? "productor", [sesion]);
 
-  /* --- sesión -------------------------------------------------------- */
+  /* --- sesión --------------------------------------------------------- */
   function entrar(correo: string) {
     setCorreoPendiente(correo);
     setPaso("codigo");
@@ -145,24 +166,23 @@ export function App() {
     setPaso("acceso");
   }
 
-  /* --- parcela ------------------------------------------------------- */
   function guardar(p: Parcela) {
     guardarParcela(p);
     setParcela(p);
   }
 
-  function marcarAccion(id: string) {
-    const nuevas = acciones.includes(id) ? acciones.filter((x) => x !== id) : [...acciones, id];
-    setAcciones(nuevas);
+  function marcarLabor(id: string) {
+    const nuevas = labores.includes(id) ? labores.filter((x) => x !== id) : [...labores, id];
+    setLabores(nuevas);
     guardarAccionesHechas(nuevas);
   }
 
-  /* --- render -------------------------------------------------------- */
+  /* --- render ---------------------------------------------------------- */
   if (paso === "cargando") {
     return (
       <div className="cargando" style={{ minHeight: "100dvh" }}>
-        <div className="giro" />
-        Abriendo Sereno…
+        <span className="cargando__brote" aria-hidden="true" />
+        <p>Abriendo Sereno…</p>
       </div>
     );
   }
@@ -186,7 +206,7 @@ export function App() {
           parcela={parcela}
           altitudMedida={reporte?.datos.punto?.altitudMetros ?? null}
           alGuardar={guardar}
-          alCalcular={() => setVista(reporte || parcela ? "resultado" : "hoy")}
+          alCalcular={() => setVista("resultado")}
         />
       );
     }
@@ -201,39 +221,39 @@ export function App() {
       return <SinParcela nombre={nombre} alConfigurar={() => setVista("parcela")} />;
     }
 
-    // Mientras no haya reporte: o estamos consultando, o falló de verdad.
-    // No se muestra "No disponible" por el hueco entre guardar la parcela y
-    // que salga la petición.
+    // Mientras no haya reporte: o estamos consultando, o falló de verdad. No se
+    // muestra "No disponible" por el hueco entre guardar la parcela y que salga
+    // la petición.
     if (!reporte && !errorReporte) {
       return (
         <div className="cargando">
-          <div className="giro" />
-          Consultando el pronóstico de su parcela…
+          <span className="cargando__brote" aria-hidden="true" />
+          <p>Consultando el pronóstico de su parcela…</p>
         </div>
       );
     }
 
     if (errorReporte || !reporte) {
       return (
-        <div className="pantalla">
-          <div className="tarjeta seccion">
-            <div className="dato dato--vacio" style={{ minHeight: 0 }}>
-              <div className="dato__titulo">Riesgo de plaga</div>
-              <div className="dato__valor">No disponible</div>
-              <div className="dato__pie">
-                {errorReporte ?? "No hay reporte."} No hay ningún reporte guardado en este
-                teléfono para esta coordenada, así que no hay nada que mostrar todavía.
-              </div>
-            </div>
+        <div className="pliego">
+          <div className="saludo">
+            <div className="saludo__fecha">{parcela.nombre}</div>
+            <h1 className="saludo__titulo">Sin reporte</h1>
+          </div>
+          <section className="seccion">
+            <Vacio
+              que="Riesgo de plaga"
+              falta={`${errorReporte ?? "No hay reporte."} Tampoco hay ninguno guardado en este teléfono para esta coordenada, así que no hay nada que mostrar todavía.`}
+            />
             <button
               type="button"
-              className="boton boton--principal"
-              style={{ marginTop: 12 }}
+              className="boton"
+              style={{ marginTop: 14 }}
               onClick={() => void consultar(parcela)}
             >
               Reintentar
             </button>
-          </div>
+          </section>
         </div>
       );
     }
@@ -254,32 +274,45 @@ export function App() {
         nombre={nombre}
         parcela={parcela}
         resultado={reporte}
-        accionesHechas={acciones}
-        alMarcarAccion={marcarAccion}
+        laboresHechas={labores}
+        alMarcarLabor={marcarLabor}
         alVerResultado={() => setVista("resultado")}
         alIrAParcela={() => setVista("parcela")}
       />
     );
   })();
 
+  const p = pinta(nivel);
+
   return (
-    <div className="app">
-      <header className="cabecera">
-        <div className="cabecera__marca">
-          <Gota tam={24} color="var(--niebla)" />
+    <div className="hoja">
+      <header className="membrete">
+        <div className="membrete__marca">
+          <Gota tam={21} />
           Sereno
         </div>
-        <div className="cabecera__estado">
-          <span aria-hidden="true">{enLinea ? "◉" : "◌"}</span>
-          {reporte
-            ? `${reporte.origen === "red" ? "Actualizado" : "Guardado"} ${marcaDeTiempo(reporte.recibidoEn)}`
-            : enLinea
-              ? "En línea"
-              : "Sin conexión"}
+        <div className="membrete__estado">
+          <span
+            className={`membrete__punto${enLinea ? "" : " membrete__punto--frio"}`}
+            aria-hidden="true"
+          />
+          {cargando && reporte
+            ? "Actualizando…"
+            : reporte
+              ? `${reporte.origen === "red" ? "Actualizado" : "Guardado"} ${marcaDeTiempo(reporte.recibidoEn)}`
+              : enLinea
+                ? "En línea"
+                : "Sin conexión"}
         </div>
       </header>
 
       {cuerpo}
+
+      {/* El medidor de riesgo también vive en la barra: desde cualquier
+          pantalla se ve en qué banda está la parcela. */}
+      <span className="sr" aria-live="polite">
+        {nivel ? `Riesgo actual: ${p.corta}, ${p.palabra}` : "Riesgo no disponible"}
+      </span>
 
       <Navegacion
         vista={vista}

@@ -1,55 +1,48 @@
 /**
- * Pantalla 3 · Sin parcela — estado vacío honesto.
+ * Sin parcela — la hoja en blanco del almanaque.
  *
- * Las tarjetas dicen «No disponible» y QUÉ FALTA. Nunca ceros, nunca datos
- * inventados: sin coordenada no hay serie meteorológica y por lo tanto no hay
- * número que mostrar.
+ * Las tarjetas dicen «No disponible» y QUÉ FALTA. Nunca ceros: sin coordenada
+ * no hay serie meteorológica, y sin serie no hay número que enseñar.
  */
 "use client";
 
-import { Gota } from "@/componentes/Logo";
-import { DatoVacio } from "@/componentes/Avisos";
+import { Cabecera, FOTOS } from "@/componentes/Fotos";
+import { Rotulo, Vacio } from "@/componentes/Avisos";
 
 export function SinParcela({ nombre, alConfigurar }: { nombre: string; alConfigurar: () => void }) {
   return (
-    <div className="pantalla">
-      <div
-        className="tarjeta tarjeta--niebla"
-        style={{ marginTop: 6, textAlign: "center", paddingBottom: 22 }}
-      >
-        <h1 style={{ fontSize: 27, color: "#fff", textAlign: "left" }}>Bienvenida, {nombre}.</h1>
-        <p
-          style={{
-            fontSize: 13.5,
-            color: "rgba(255,255,255,0.8)",
-            textAlign: "left",
-            marginTop: 6,
-          }}
-        >
-          Ubiquemos su parcela para calcular el clima y el riesgo de su cultivo.
-        </p>
-        <div style={{ margin: "18px 0 16px" }}>
-          <Gota tam={78} color="rgba(255,255,255,0.9)" />
+    <>
+      <Cabecera foto={FOTOS.cafetal} titulo={`Bienvenida, ${nombre}.`} />
+
+      <div className="pliego">
+        <section className="tarjeta entra entra-1" style={{ position: "relative", zIndex: 2 }}>
+          <p style={{ fontSize: 16, margin: "0 0 16px", color: "var(--hoja-honda)" }}>
+            Ubiquemos su parcela para calcular el clima y el riesgo de su cultivo.
+          </p>
+          <button type="button" className="boton" onClick={alConfigurar}>
+            Configurar mi parcela
+          </button>
+        </section>
+
+      <section className="seccion">
+        <Rotulo>Lo que todavía no podemos decirle</Rotulo>
+        <div style={{ display: "grid", gap: 10 }}>
+          <Vacio que="Riesgo de plaga" falta="Falta ubicar la parcela." />
+          <Vacio que="Ventana de aplicación" falta="Falta ubicar la parcela." />
+          <Vacio que="Clima de la finca" falta="Falta ubicar la parcela." />
         </div>
-        <button type="button" className="boton boton--contorno" onClick={alConfigurar}>
-          ◎ Configurar mi parcela
-        </button>
-      </div>
+      </section>
 
-      <div className="datos">
-        <DatoVacio titulo="Riesgo de plaga" falta="Falta ubicar la parcela." />
-        <DatoVacio titulo="Temperatura" falta="Falta ubicar la parcela." />
-        <DatoVacio titulo="Humedad" falta="Falta ubicar la parcela." />
-        <DatoVacio titulo="Lluvia 24 h" falta="Falta ubicar la parcela." />
-      </div>
-
-      <div className="aviso aviso--roble" style={{ marginTop: 12 }}>
-        <span aria-hidden="true">◈</span>
+      <div className="nota" style={{ marginTop: 18 }}>
+        <span className="nota__signo" aria-hidden="true">
+          ◈
+        </span>
         <span>
           Sin coordenada no hay pronóstico, y sin pronóstico no hay número. Preferimos
-          decir <b>No disponible</b> a enseñar un cero.
+          decir <b>No disponible</b> a enseñarle un cero.
         </span>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
