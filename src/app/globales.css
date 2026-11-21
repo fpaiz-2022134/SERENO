@@ -1500,3 +1500,109 @@ input { font-family: inherit; font-size: 17px; }
 .portada__alto .portada__lema { color: rgba(255, 255, 255, 0.82); }
 .portada__alto .portada__promesa { color: rgba(255, 255, 255, 0.95); }
 .portada form { position: relative; z-index: 1; }
+
+/* ==================================================================
+   DE DÓNDE SALE ESTE NÚMERO
+   Pegado al veredicto, no al final del scroll. Plegado por defecto:
+   la respuesta tiene que estar a un toque del número que explica, sin
+   empujar hacia abajo lo que el productor vino a ver.
+   ================================================================== */
+
+.procedencia {
+  margin-top: 12px;
+  background: var(--nube);
+  border-radius: var(--r);
+  box-shadow: var(--flota-baja);
+  overflow: hidden;
+}
+
+.procedencia__abrir {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 16px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--hoja-honda);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.procedencia__abrir::-webkit-details-marker { display: none; }
+
+.procedencia__punto {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.procedencia__flecha {
+  margin-left: auto;
+  color: var(--tinta-2);
+  font-size: 19px;
+  line-height: 1;
+  transition: transform 220ms var(--suave);
+}
+
+.procedencia[open] .procedencia__flecha { transform: rotate(90deg); }
+
+.procedencia__cuerpo {
+  padding: 0 16px 16px;
+  animation: entrar 380ms var(--suave) both;
+}
+
+/* La cadena: fuente → medición → umbral → índice → banda, numerada,
+   para que se lea como un camino y no como un párrafo. */
+.cadena {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: paso;
+}
+
+.cadena li {
+  counter-increment: paso;
+  position: relative;
+  padding: 0 0 13px 30px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--hoja-honda);
+}
+
+.cadena li::before {
+  content: counter(paso);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--musgo);
+  color: var(--hoja-media);
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+/* El hilo que une los pasos */
+.cadena li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 9.5px;
+  top: 23px;
+  bottom: 4px;
+  width: 1.5px;
+  background: var(--musgo);
+}
+
+.procedencia__pie {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tinta-2);
+  margin: 4px 0 0;
+  padding-top: 11px;
+  border-top: 1px solid var(--hilo);
+}

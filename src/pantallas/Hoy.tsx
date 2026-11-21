@@ -20,6 +20,7 @@ import { useMemo, useState } from "react";
 import { Balanza, Grafica } from "@/componentes/Grafica";
 import { Medidor } from "@/componentes/Medidor";
 import { Cabecera, FOTOS, Referencia } from "@/componentes/Fotos";
+import { DeDondeSale } from "@/componentes/DeDondeSale";
 import { AvisoEstimacion, AvisoSinConexion, Imprenta, Rotulo, Vacio } from "@/componentes/Avisos";
 import { Flecha, Gota, Hoja, Regla } from "@/componentes/Iconos";
 import { faseDeVentana } from "@/lib/aviso";
@@ -67,6 +68,15 @@ export function Hoy({
   );
 
   const indice = ventana?.indiceMaximo ?? curva[0]?.indice ?? 0;
+
+  /** El dia que manda en la ventana: el de mayor indice. De el salen las horas
+   *  de mojado y la temperatura que explican el numero de arriba. */
+  const pico = useMemo(() => {
+    const dentro = ventana
+      ? curva.filter((x) => x.dia >= ventana.inicio && x.dia <= ventana.fin)
+      : curva;
+    return dentro.length ? dentro.reduce((a, b) => (b.indice > a.indice ? b : a)) : null;
+  }, [curva, ventana]);
   const p = pinta(ventana?.nivel ?? curva[0]?.nivel);
   const pDia = pinta(dia?.nivel);
 
@@ -200,10 +210,25 @@ export function Hoy({
               )}
             </section>
 
+            {/* Pegado al veredicto: la respuesta a "de donde salio este
+                numero" tiene que estar junto al numero, no ocho bloques mas
+                abajo dentro del clima. */}
+            <div className="entra entra-2">
+              <DeDondeSale
+                procedencia={d.procedencia}
+                recibidoEn={resultado.recibidoEn}
+                dias={curva.length}
+                pico={pico}
+                indice={indice}
+                palabra={p.palabra}
+                color={p.color}
+              />
+            </div>
+
             <button
               type="button"
               className="boton boton--riesgo entra entra-2"
-              style={{ marginTop: 14 }}
+              style={{ marginTop: 12 }}
               onClick={alVerResultado}
             >
               Ver por qué y los costos
