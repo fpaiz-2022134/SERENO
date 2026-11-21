@@ -130,9 +130,17 @@ export function Resultado({
       {ventana ? (
         <>
           <p style={{ fontSize: 16, lineHeight: 1.4, marginTop: 16 }}>
-            Ventana de riesgo del <b>{fechaCorta(ventana.inicio)}</b> al{" "}
-            <b>{fechaCorta(ventana.fin)}</b>. Aplique antes del{" "}
-            <b>{fechaCompleta(ventana.aplicarAntesDe)}</b>.
+            {ventana.inicio === ventana.fin ? (
+              <>
+                Ventana de riesgo: <b>{fechaCorta(ventana.inicio)}</b>.
+              </>
+            ) : (
+              <>
+                Ventana de riesgo del <b>{fechaCorta(ventana.inicio)}</b> al{" "}
+                <b>{fechaCorta(ventana.fin)}</b>.
+              </>
+            )}{" "}
+            Aplique antes del <b>{fechaCompleta(ventana.aplicarAntesDe)}</b>.
           </p>
           {/* El motor puede poner la fecha límite en el pasado si la ventana
               ya empezó. No se maquilla la fecha: se explica. */}
