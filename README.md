@@ -147,6 +147,11 @@ que GDELT exige que los términos con `OR` vayan entre paréntesis
 (`"Queries containing OR'd terms must be surrounded by ()."`), y eso ya está
 corregido en el módulo.
 
+En la corrida final las tres consultas devolvieron **HTTP 429**: probando la API
+intensivamente durante el día nuestra IP quedó limitada. El módulo ya serializa a
+5.5 s, pero **conviene volver a correr `npm run probar-fuentes` en frío** para
+separar «sin cobertura» de «IP limitada».
+
 **No sabemos todavía** si es que no hay cobertura reciente de estos términos o si
 la consulta necesita otra forma. **Para el pitch: no prometer el mapa de brotes
 por noticias.** El módulo está listo y el panel dice «esta fuente no devolvió
@@ -193,6 +198,8 @@ uno a uno**.
 El importador lee **esa única página de índice** y extrae título, periodo
 (`YYYY-MM`), URL y tema, con buscador por enfermedad. Probado: encuentra los
 boletines mensuales *Reporte de Roya y Recomendaciones* hasta **octubre de 2026**.
+En la corrida completa extrajo **149 documentos**: 74 de roya, 17 de broca, 8 de
+poda y tejido, 5 de fertilización, 4 de variedades, 3 de ojo de gallo, 1 de clima.
 
 **Lo que a propósito NO hace:** no rastrea el sitio, no descarga ni redistribuye
 los PDF (`urlDocumento` apunta al PDF oficial de Anacafé) y no extrae su texto
@@ -251,6 +258,22 @@ Si un dato está viejo, se ve.
 | `GET /api/mercado?noticias=1` | **mercado** | precios del MAGA (con el `cafe.disponible:false`) y noticias de GDELT |
 | `GET /api/historico?lat&lon&anio&respaldo=1` | la corrida hacia atrás | eventos sobre la temporada histórica. `esPronostico: false` explícito |
 | `GET /api/fuentes?probar=1&lat&lon` | diagnóstico | ficha de las seis fuentes y, con `probar=1`, una petición real a cada una |
+
+### ⚠️ Observación de la corrida de hoy, para antes del pitch
+
+En la coordenada de demo (912 m, noviembre), el pronóstico de 16 días da
+**19 rachas, 8 eventos confirmados** y la ventana de acción **abarca los 16 días
+completos**: el índice queda ≥ 0.5 todos los días. El motor está diciendo la
+verdad —a esa altura y con esa humedad las condiciones son favorables de forma
+casi continua— pero entonces la frase «aplicá antes del jueves» pierde filo,
+porque no hay un «jueves» que destaque.
+
+**Qué hacer, y es decisión de producto, no de código:** para el demo, o se elige
+una coordenada/temporada donde la ventana sea un tramo corto y claro, o se sube
+la banda del aviso (por ejemplo avisar solo en `muy_favorable`, ≥ 0.75, en vez de
+`favorable`, ≥ 0.5). El umbral de la ventana está en un solo lugar
+(`ventanaDeAccion` en `src/lib/motor/riesgo.ts`). **No tocarlo sin decidirlo:**
+subirlo hace el aviso más útil pero pierde eventos reales.
 
 Los cinco datos de `/api/prevencion` son los de la investigación §0A: ventana de
 acción con fecha · índice 0-1 en tres bandas (las del SENAMHI: 0–0.5 poco
