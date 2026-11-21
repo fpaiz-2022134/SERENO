@@ -6,6 +6,10 @@
  * ESTO ES HISTORICO, NO PRONOSTICO. `procedencia.esPronostico` viene en false y
  * la respuesta lo repite: no presentar estos datos como pronostico.
  *
+ * Con `guardar=1` guarda los eventos calculados en la base (rol de servicio),
+ * con los parametros con que se calcularon: el motor es determinista, asi que la
+ * fila es reproducible.
+ *
  * Con `respaldo=1` agrega el resumen de NASA POWER para la misma ventana (la
  * fuente que uso el paper ancla de Brasil). NASA POWER horario solo existe desde
  * 2001-01-01, asi que para 2012 si sirve.
@@ -15,6 +19,7 @@ import { historicoHorario } from "@/lib/fuentes/open-meteo";
 import { HORARIO_DESDE, historicoHorarioPower } from "@/lib/fuentes/nasa-power";
 import { detectarEventos, riesgoPorDia } from "@/lib/motor/riesgo";
 import { ROYA_CAFE } from "@/lib/motor/parametros";
+import { estadoBase, guardarEventos } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +68,29 @@ export async function GET(peticion: Request) {
     }
   }
 
+  // Guardado opcional. Si la base no esta configurada se dice, no se finge.
+  let guardado: unknown = null;
+  if (q.get("guardar") === "1") {
+    const estado = estadoBase();
+    if (!estado.configurada) {
+      guardado = { ok: false, error: `Falta ${estado.faltan.join(", ")} en .env.local` };
+    } else {
+      try {
+        const n = await guardarEventos({
+          eventos,
+          latitud: serie.datos.latitud,
+          longitud: serie.datos.longitud,
+          parametros: ROYA_CAFE,
+          fuente: serie.datos.procedencia.fuente,
+          esPronostico: false,
+        });
+        guardado = { ok: true, filas: n, tabla: "public.eventos_infeccion" };
+      } catch (e) {
+        guardado = { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    }
+  }
+
   return json({
     ok: true,
     esPronostico: false,
@@ -80,6 +108,7 @@ export async function GET(peticion: Request) {
     detalle: confirmados.slice(0, 20),
     curva,
     respaldoPower,
+    guardado,
     procedencia: serie.datos.procedencia,
     advertencia: ADVERTENCIA_MOTOR,
   });

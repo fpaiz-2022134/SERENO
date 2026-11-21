@@ -1,6 +1,11 @@
 -- =====================================================================
 -- SERENO · esquema inicial
 --
+-- POSTGRES PURO. No depende de ninguna extension ni esquema de un proveedor:
+-- corre igual en Neon (donde esta hoy), en Supabase o en un Postgres local.
+-- La identidad del usuario NO viene de `auth.uid()`: viene de una variable de
+-- sesion que pone el backend en cada peticion (ver 0002_rls.sql).
+--
 -- Soporta:
 --   · parcelas con GPS y altura (feature 13)
 --   · los DIEZ datos que aporta el productor (atributos de ExpeRoya, ver
@@ -8,9 +13,7 @@
 --   · series horarias cacheadas, eventos de infeccion calculados
 --   · documentos de Anacafe, noticias de GDELT, precios del MAGA
 --
--- RLS activado en todo: un productor ve SOLO sus parcelas y lo que cuelga de
--- ellas. Los catalogos y el contenido publico (documentos, noticias, precios)
--- son de lectura para cualquier usuario autenticado.
+-- RLS va en 0002_rls.sql: un productor ve SOLO sus parcelas.
 -- =====================================================================
 
 create extension if not exists "pgcrypto";
@@ -19,10 +22,21 @@ create extension if not exists "pgcrypto";
 -- 1 · Productores y parcelas
 -- ---------------------------------------------------------------------
 
+-- Usuarios. Tabla propia a proposito: es lo que hace el esquema portable.
+-- Si manana se mete un proveedor de auth (Supabase, Neon Auth, Clerk), se guarda
+-- aqui su id externo en `sujeto_externo` y no se toca ninguna otra tabla.
+create table if not exists public.usuarios (
+  id uuid primary key default gen_random_uuid(),
+  correo text unique,
+  -- Id del usuario en el proveedor de identidad, cuando haya uno.
+  sujeto_externo text unique,
+  creado_en timestamptz not null default now()
+);
+
 create table if not exists public.productores (
   id uuid primary key default gen_random_uuid(),
-  -- Ligado a auth.users de Supabase: es la llave de todo el RLS.
-  usuario_id uuid not null unique references auth.users (id) on delete cascade,
+  -- Es la llave de todo el RLS.
+  usuario_id uuid not null unique references public.usuarios (id) on delete cascade,
   nombre text,
   telefono_whatsapp text,
   departamento text,

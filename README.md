@@ -304,44 +304,72 @@ acumuladas vs. requeridas · fecha en que se verían las manchas · días desde 
 
 ---
 
-## Supabase
+## Base de datos
 
-Migraciones en [`supabase/migraciones/`](supabase/migraciones/):
+**Está en Neon** (proyecto `sereno`, Postgres 17, us-east-1), pero el esquema es
+**Postgres puro**: no usa ninguna extensión ni esquema de un proveedor, así que
+la misma migración corre en Neon, en Supabase o en un Postgres local.
 
-- **`0001_esquema_inicial.sql`** — productores, parcelas con GPS y altura, los
-  **diez datos del productor** (atributos de ExpeRoya: incidencia, variedad,
-  aplicaciones, sombra, poda, carga de fruto, floración, cosecha, fertilización),
-  series horarias cacheadas, eventos de infección calculados, avisos, documentos
-  de Anacafé, noticias y precios.
-- **`0002_rls.sql`** — RLS activado en las 12 tablas. **Un productor ve solo sus
-  parcelas** y lo que cuelga de ellas.
+Migraciones en [`db/migraciones/`](db/migraciones/), aplicadas con
+`npm run migrar`, que lleva su propio registro en `public.migraciones` y mete
+cada archivo en una transacción:
 
-**Verificado de verdad**, no asumido: las dos migraciones se aplicaron contra un
-Postgres 16 local (con `auth.users` y los roles de Supabase simulados) y se probó
-el aislamiento con dos usuarios:
+| Migración | Qué trae |
+|---|---|
+| `0001_esquema_inicial.sql` | 13 tablas: usuarios, productores, parcelas con GPS y altura, los **diez datos del productor** (atributos de ExpeRoya), series horarias cacheadas, eventos de infección, avisos, documentos de Anacafé, noticias y precios |
+| `0002_rls.sql` | RLS en todas. Un productor ve solo sus parcelas |
+| `0003_eventos_sin_duplicados.sql` | índice único para que reprocesar la misma serie no duplique eventos |
+
+### Cómo funciona el RLS sin `auth.uid()`
+
+Eso es de Supabase; aquí la identidad viene de una **variable de sesión** que el
+backend pone al abrir la transacción:
+
+```sql
+SET LOCAL sereno.usuario_id = '<uuid>';
+```
+
+`SET LOCAL` es deliberado: muere al terminar la transacción, así que la identidad
+no se filtra a la siguiente petición del pool.
+
+**Y hay dos roles, que es la parte que importa:**
+
+| Rol | Quién es | RLS |
+|---|---|---|
+| `sereno_owner` (dueño) | corre migraciones, el motor, guarda series, escribe las fuentes externas | **lo salta** (en Postgres el dueño de la tabla salta RLS) |
+| `sereno_app` | atiende las peticiones de un productor | **se le aplica** |
+
+> Si alguien atiende peticiones de usuario con la conexión de servicio, **el RLS
+> deja de servir sin que salte ningún error**. Por eso son dos funciones distintas
+> en [`src/lib/db.ts`](src/lib/db.ts) (`conexionServicio()` y `comoProductor()`) y
+> no un parámetro, y por eso está escrito también dentro de `0002_rls.sql`.
+
+### Verificado contra la base real, no asumido
+
+`npm run probar-rls` crea dos productores, comprueba el aislamiento y borra lo
+que creó. Corrido contra Neon:
 
 ```
-Como Ana  → parcelas visibles: 1   (0 de Beto)   variedades: 10 (público)
-Como Beto → parcelas visibles: 1
-authenticated INSERT en noticias        → ERROR: violates row-level security policy
-authenticated UPDATE de parcela ajena   → UPDATE 0
+✓ Ana ve 1 parcela y es la suya                              — vio 1: Parcela de Ana
+✓ Ana no ve el reporte de incidencia de Beto                 — vio 0
+✓ Ana si lee el contenido publico (variedades)               — vio 10
+✓ Beto ve 1 parcela y es la suya                             — vio 1: Parcela de Beto
+✓ Ana no puede editar la parcela de Beto                     — afecto 0 filas
+✓ Ana no puede robarse la parcela de Beto cambiando el productor_id
+✓ La app NO puede escribir las fuentes externas (noticias)
+✓ Un usuario desconocido no ve ninguna parcela               — vio 0
+✓ Los datos de prueba quedaron borrados (cascada)            — quedan 0
 ```
 
-El contenido público (variedades, documentos, noticias, precios, series) es de
-**lectura** para autenticados y **sin ninguna policy de escritura**: solo el
-`service_role` del backend escribe las fuentes externas.
+**Y el guardado funciona de punta a punta.** `/api/historico?...&guardar=1` sobre
+mayo de 2012 escribió **60 filas** en `eventos_infeccion`, 4 de ellas eventos
+confirmados y 27 descartadas por lavado de lluvia. Cada fila guarda **los
+parámetros con que se calculó**, así que es reproducible: el motor es
+determinista. Llamarlo dos veces deja 60 filas, no 120.
 
 **Nada de llaves en el repo.** `.env.local` está en `.gitignore`; la plantilla es
-[`.env.example`](.env.example). El backend **funciona sin Supabase**: clima,
-prevención, mercado e histórico corren contra las APIs públicas.
-
-### ⛔ Lo que falta y necesita al usuario
-
-**Las migraciones no se han aplicado a un proyecto de Supabase real** porque no
-tenemos credenciales. Hace falta `NEXT_PUBLIC_SUPABASE_URL`,
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` en `.env.local`.
-
----
+[`.env.example`](.env.example). `npm run crear-rol-app` genera la contraseña de
+`sereno_app`, la escribe solo en `.env.local` y **no la imprime**.
 
 ## Cómo correrlo
 
@@ -355,6 +383,14 @@ npm run dev              # http://localhost:3000
 ```bash
 npm run probar-fuentes               # las 6 fuentes con peticiones reales
 npm run corrida-historica            # 2010-2013 en la coordenada de demo
+```
+
+Con base de datos:
+
+```bash
+npm run migrar                       # aplica las migraciones que falten
+npm run crear-rol-app                # crea sereno_app y escribe DATABASE_URL_APP
+npm run probar-rls                   # comprueba el aislamiento contra la base real
 ```
 
 ### La coordenada de demo
@@ -384,9 +420,10 @@ src/lib/fuentes/
   base.ts         fetch con timeout, User-Agent, caché, Procedencia, avisos de dato viejo
   open-meteo.ts met-norway.ts gdelt.ts nasa-power.ts anacafe.ts maga-precios.ts
 src/lib/aviso.ts  redacción determinista del mensaje de WhatsApp
+src/lib/db.ts     Postgres: rol de servicio vs. rol con RLS, guardado de eventos
 src/app/api/      clima · prevencion · mercado · historico · fuentes
-supabase/migraciones/
-scripts/          probar-fuentes.ts · corrida-historica.ts
+db/migraciones/   0001 esquema · 0002 RLS · 0003 sin duplicados
+scripts/          probar-fuentes · corrida-historica · migrar · crear-rol-app · probar-rls
 tests/motor.test.ts
 ```
 
