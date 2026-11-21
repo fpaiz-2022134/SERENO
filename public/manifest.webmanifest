@@ -1,7 +1,7 @@
 {
-  "name": "Sereno · almanaque de la parcela",
+  "name": "Sereno · clima para el agricultor",
   "short_name": "Sereno",
-  "description": "Aviso de ventana de infección de roya del café, por parcela, con días de anticipación.",
+  "description": "Aviso de ventana de infección de roya del café, por parcela, con días de anticipación. El riesgo lo decide un motor determinista, no una IA.",
   "lang": "es-GT",
   "start_url": "/",
   "scope": "/",
