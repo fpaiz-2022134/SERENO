@@ -124,21 +124,51 @@ export function Hoy({
                 {p.palabra}
               </strong>
 
+              {/* OJO: la ventana se abre con el índice en banda (≥ 0.5), que NO
+                  es lo mismo que un evento de infección confirmado. El motor
+                  los distingue en `contieneEvento`, y el texto tiene que
+                  distinguirlos también: decir «se juntan las condiciones de
+                  infección» con `contieneEvento: false` afirma algo que la
+                  propia API desmiente si alguien la abre. */}
               <p className="veredicto__frase" style={{ textAlign: "center" }}>
-                {ventana ? (
-                  ventana.inicio === ventana.fin ? (
-                    <>
-                      Las condiciones de infección se juntan el{" "}
-                      <b>{fechaCorta(ventana.inicio)}</b>.
-                    </>
-                  ) : (
-                    <>
-                      Las condiciones se juntan del <b>{fechaCorta(ventana.inicio)}</b> al{" "}
-                      <b>{fechaCorta(ventana.fin)}</b>.
-                    </>
-                  )
-                ) : (
+                {!ventana ? (
                   <>El pronóstico de {curva.length} días no junta condiciones de infección.</>
+                ) : ventana.contieneEvento ? (
+                  <>
+                    Las condiciones de infección se juntan{" "}
+                    {ventana.inicio === ventana.fin ? (
+                      <>
+                        el <b>{fechaCorta(ventana.inicio)}</b>
+                      </>
+                    ) : (
+                      <>
+                        del <b>{fechaCorta(ventana.inicio)}</b> al{" "}
+                        <b>{fechaCorta(ventana.fin)}</b>
+                      </>
+                    )}
+                    .
+                  </>
+                ) : (
+                  <>
+                    El riesgo sube{" "}
+                    {ventana.inicio === ventana.fin ? (
+                      <>
+                        el <b>{fechaCorta(ventana.inicio)}</b>
+                      </>
+                    ) : (
+                      <>
+                        del <b>{fechaCorta(ventana.inicio)}</b> al{" "}
+                        <b>{fechaCorta(ventana.fin)}</b>
+                      </>
+                    )}
+                    , pero <b>todavía no se completa una infección</b>
+                    {pico?.horasRequeridas != null && Number.isFinite(pico.horasRequeridas)
+                      ? `: faltan ${Math.max(
+                          0,
+                          Math.round(pico.horasRequeridas - pico.horasMojadas),
+                        )} horas de hoja mojada.`
+                      : "."}
+                  </>
                 )}
               </p>
 
