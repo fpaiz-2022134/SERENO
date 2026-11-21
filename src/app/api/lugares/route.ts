@@ -79,7 +79,10 @@ export async function GET(peticion: Request) {
 }
 
 function detalleDe(r: Resultado): string {
-  const limpiar = (t?: string) => t?.replace(/^Departamento de\s+/i, "").trim();
+  // El geocodificador escribe "Departamento de X" y "Municipio de X"; en
+  // pantalla sobra el prefijo y lo que importa es el nombre.
+  const limpiar = (t?: string) =>
+    t?.replace(/^(Departamento|Municipio)\s+de\s+/i, "").trim();
   const partes = [limpiar(r.admin2), limpiar(r.admin1)]
     .filter((t): t is string => Boolean(t) && t !== r.name)
     .filter((t, i, xs) => xs.indexOf(t) === i);
